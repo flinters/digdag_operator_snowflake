@@ -1,4 +1,4 @@
-package example
+package dev.hiro_hori.digdag_operator_snowflake
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
