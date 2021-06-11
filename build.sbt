@@ -16,6 +16,7 @@ lazy val root = (project in file("."))
       scalaTest % Test,
       "io.digdag" % "digdag-spi" % "0.9.42" % Provided,
       "io.digdag" % "digdag-plugin-utils" % "0.9.42" % Provided,
+      "net.snowflake" % "snowflake-jdbc" % "3.13.4",
     )
   )
 
