@@ -1,0 +1,18 @@
+_export:
+    plugin:
+        repositories:
+            - file:///Users/h_hori/.m2/repository/
+        dependencies:
+            - dev.hiro-hori:digdag-operator-snowflake_2.13:0.1.0-SNAPSHOT
+    snow:
+        host: zz99999.us-east-99.aws.snowflakecomputing.com
+        # role: sysadmin
+        user: snow_user
+        warehouse: compute_wh
+        # schema: public
+
++run_task:
+    snow>: example.sql
+    database: TEST_HORI
+    schema: public
+    create_or_replace_table: hogehoge
