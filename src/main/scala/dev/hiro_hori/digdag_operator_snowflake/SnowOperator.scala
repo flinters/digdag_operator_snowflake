@@ -38,9 +38,9 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
       getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists"),
       getOptionalParameterFromOperatorParameter(config, "insert_into")
     ) match {
-      case (Some(table), _, _, _) => s"CREATE TABLE $table " + source.mkString
-      case (_, Some(table), _, _) => s"CREATE OR REPLACE TABLE $table " + source.mkString
-      case (_, _, Some(table), _) => s"CREATE TABLE $table IF NOT EXISTS " + source.mkString
+      case (Some(table), _, _, _) => s"CREATE TABLE $table AS " + source.mkString
+      case (_, Some(table), _, _) => s"CREATE OR REPLACE TABLE $table AS " + source.mkString
+      case (_, _, Some(table), _) => s"CREATE TABLE $table IF NOT EXISTS AS " + source.mkString
       case (_, _, _, Some(table)) => s"INSERT INTO $table " + source.mkString
       case _ => source.mkString
     }
