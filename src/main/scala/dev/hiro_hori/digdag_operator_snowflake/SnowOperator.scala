@@ -29,7 +29,7 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
     val createTableIfNotExists = getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists")
     val insertInto = getOptionalParameterFromOperatorParameter(config, "insert_into")
     if (Seq(createTable, createOrReplaceTable, createTableIfNotExists, insertInto).count(_.isDefined) >= 2) {
-      throw new RuntimeException("you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, create_table_if_not_exists")
+      throw new RuntimeException("you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, insert_into)")
     }
     val sql = (
       getOptionalParameterFromOperatorParameter(config, "create_table"),
