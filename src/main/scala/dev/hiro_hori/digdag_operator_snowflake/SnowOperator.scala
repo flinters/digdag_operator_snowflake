@@ -56,8 +56,11 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
       getConfigFromOperatorParameterOrExportedParameterOptional(config, "role"),
     )
     val stmt = conn.createStatement()
-    stmt.execute(sql)
-    conn.close()
+    try {
+      stmt.execute(sql)
+    } finally {
+      conn.close()
+    }
     // オペレータの処理が無事成功した場合はTaskResultを返す
     TaskResult.empty(this.request)
   }
