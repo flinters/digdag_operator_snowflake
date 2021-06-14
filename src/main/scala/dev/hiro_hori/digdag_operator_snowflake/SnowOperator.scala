@@ -5,10 +5,9 @@ import io.digdag.util.BaseOperator
 import org.slf4j.LoggerFactory
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.digdag.client.config.Config
-import net.snowflake.client.jdbc.SnowflakeDriver
+import net.snowflake.client.jdbc.{SnowflakeDriver, SnowflakeSQLException}
 
 import java.util.Properties
-
 import java.sql.{Connection, DriverManager}
 import scala.io.Source
 
@@ -84,7 +83,12 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
     warehouse.foreach(x => prop.put("warehouse", x))
     role.foreach(x => prop.put("role", x))
 //    logger.debug(prop.toString)
-    DriverManager.getConnection(s"jdbc:snowflake://${host}", prop)
+    try {
+      DriverManager.getConnection(s"jdbc:snowflake://${host}", prop)
+    } catch {
+      case e: SnowflakeSQLException =>
+        throw new RuntimeException(e)
+    }
   }
 
   def getOptionalParameterFromOperatorParameter(config: Config, configName: String): Option[String] =
