@@ -17,9 +17,7 @@ lazy val root = (project in file("."))
       "io.digdag" % "digdag-spi" % "0.9.42" % Provided,
       "io.digdag" % "digdag-plugin-utils" % "0.9.42" % Provided,
       "net.snowflake" % "snowflake-jdbc" % "3.13.4",
-      "com.github.hiro-hori" % "digdag_operator_snowflake" % "-SNAPSHOT"
     )
   )
 
-resolvers += "jitpack" at "https://jitpack.io"
 // See https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html for instructions on how to publish to Sonatype.
