@@ -1,20 +1,16 @@
 package dev.hiro_hori.digdag_operator_snowflake
 
-import collection.JavaConverters._
 import io.digdag.spi.{Operator, OperatorContext, OperatorFactory, TaskResult}
 import io.digdag.util.BaseOperator
 import org.slf4j.LoggerFactory
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.google.common.base.Optional
 import io.digdag.client.config.Config
 import net.snowflake.client.jdbc.SnowflakeDriver
 
 import java.util.Properties
 
-//import java.net.URL
 import java.sql.{Connection, DriverManager}
 import scala.io.Source
-import scala.jdk.OptionConverters._
 
 
 // オペレータ本体
@@ -29,7 +25,25 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
     logger.debug(pretty)
 
     val source = Source.fromFile(config.get("_command", classOf[String]))
-    val sql = source.mkString
+    val createTable = getOptionalParameterFromOperatorParameter(config, "create_table")
+    val createOrReplaceTable = getOptionalParameterFromOperatorParameter(config, "create_or_replace_table")
+    val createTableIfNotExists = getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists")
+    val insertInto = getOptionalParameterFromOperatorParameter(config, "insert_into")
+    if (Seq(createTable, createOrReplaceTable, createTableIfNotExists, insertInto).count(_.isDefined) >= 2) {
+      throw new RuntimeException("you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, create_table_if_not_exists")
+    }
+    val sql = (
+      getOptionalParameterFromOperatorParameter(config, "create_table"),
+      getOptionalParameterFromOperatorParameter(config, "create_or_replace_table"),
+      getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists"),
+      getOptionalParameterFromOperatorParameter(config, "insert_into")
+    ) match {
+      case (Some(table), _, _, _) => s"CREATE TABLE $table " + source.mkString
+      case (_, Some(table), _, _) => s"CREATE OR REPLACE TABLE $table " + source.mkString
+      case (_, _, Some(table), _) => s"CREATE TABLE $table IF NOT EXISTS " + source.mkString
+      case (_, _, _, Some(table)) => s"INSERT INTO $table " + source.mkString
+      case _ => source.mkString
+    }
     source.close()
     logger.info(sql)
 
@@ -71,6 +85,9 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
     role.foreach(x => prop.put("role", x))
     DriverManager.getConnection(s"jdbc:snowflake://${host}", prop)
   }
+
+  def getOptionalParameterFromOperatorParameter(config: Config, configName: String): Option[String] =
+    Option(config.getOptional(configName, classOf[String]).orNull())
 
   def getConfigFromOperatorParameterOrExportedParameter(config: Config, configName: String): String =
     Option(config.getOptional(configName, classOf[String]).orNull())
