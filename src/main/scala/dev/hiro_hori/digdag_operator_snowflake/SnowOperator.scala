@@ -51,7 +51,7 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
       getConfigFromOperatorParameterOrExportedParameter(config,"host"),
       getConfigFromOperatorParameterOrExportedParameter(config,"user"),
       this.context.getSecrets.getSecret("snow.password"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "db"),
+      getConfigFromOperatorParameterOrExportedParameterOptional(config, "database"),
       getConfigFromOperatorParameterOrExportedParameterOptional(config, "schema"),
       getConfigFromOperatorParameterOrExportedParameterOptional(config, "warehouse"),
       getConfigFromOperatorParameterOrExportedParameterOptional(config, "role"),
@@ -67,7 +67,7 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
                      host: String,
                      user: String,
                      password: String,
-                     db: Option[String],
+                     database: Option[String],
                      schema: Option[String],
                      warehouse: Option[String],
                      role: Option[String]
@@ -79,10 +79,11 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
     val prop = new Properties()
     prop.put("user", user)
     prop.put("password", password)
-    db.foreach(x => prop.put("db", x))
+    database.foreach(x => prop.put("db", x))
     schema.foreach(x => prop.put("schema", x))
     warehouse.foreach(x => prop.put("warehouse", x))
     role.foreach(x => prop.put("role", x))
+//    logger.debug(prop.toString)
     DriverManager.getConnection(s"jdbc:snowflake://${host}", prop)
   }
 
