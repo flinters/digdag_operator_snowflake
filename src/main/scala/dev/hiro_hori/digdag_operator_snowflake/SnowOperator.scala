@@ -1,6 +1,6 @@
 package dev.hiro_hori.digdag_operator_snowflake
 
-import io.digdag.spi.{Operator, OperatorContext, OperatorFactory, TaskResult}
+import io.digdag.spi.{Operator, OperatorContext, OperatorFactory, TaskExecutionException, TaskResult}
 import io.digdag.util.BaseOperator
 import org.slf4j.LoggerFactory
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -54,15 +54,21 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
       getConfigFromOperatorParameterOrExportedParameterOptional(config, "schema"),
       getConfigFromOperatorParameterOrExportedParameterOptional(config, "warehouse"),
       getConfigFromOperatorParameterOrExportedParameterOptional(config, "role"),
+      (
+        getConfigFromOperatorParameterOrExportedParameterOptional(config, "session_unixtime_sql_variable_name"),
+        getConfigFromOperatorParameterOrExportedParameter(config, "session_unixtime"),
+      )
     )
     val stmt = conn.createStatement()
     try {
       stmt.execute(sql)
+      // オペレータの処理が無事成功した場合はTaskResultを返す
+      TaskResult.empty(this.request)
+    } catch {
+      case e: Throwable => throw new TaskExecutionException(e)
     } finally {
       conn.close()
     }
-    // オペレータの処理が無事成功した場合はTaskResultを返す
-    TaskResult.empty(this.request)
   }
 
   def getConnection(
@@ -72,7 +78,8 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
                      database: Option[String],
                      schema: Option[String],
                      warehouse: Option[String],
-                     role: Option[String]
+                     role: Option[String],
+                     unixtimeSetting: (Option[String], String),
   ): Connection = {
     DriverManager.registerDriver(
       new SnowflakeDriver()
@@ -85,6 +92,7 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
     schema.foreach(x => prop.put("schema", x))
     warehouse.foreach(x => prop.put("warehouse", x))
     role.foreach(x => prop.put("role", x))
+    unixtimeSetting._1.foreach(x => prop.put("$" + x, unixtimeSetting._2))
 //    logger.debug(prop.toString)
     try {
       DriverManager.getConnection(s"jdbc:snowflake://${host}", prop)

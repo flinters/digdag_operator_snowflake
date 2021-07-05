@@ -10,6 +10,7 @@ _export:
         user: snow_user
         warehouse: compute_wh
         # schema: public
+        session_unixtime_sql_variable_name: session_time
 
 +run_task:
     snow>: example.sql
