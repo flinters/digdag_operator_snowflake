@@ -1,19 +1,19 @@
 package dev.hiro_hori.digdag_operator_snowflake
 
-import io.digdag.spi.{Operator, OperatorContext, OperatorFactory, TaskExecutionException, TaskResult}
+import io.digdag.spi.{Operator, OperatorContext, OperatorFactory, TaskExecutionException, TaskResult, TemplateEngine}
 import io.digdag.util.BaseOperator
 import org.slf4j.LoggerFactory
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.digdag.client.config.Config
 import net.snowflake.client.jdbc.{SnowflakeDriver, SnowflakeSQLException}
 
+import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Properties
 import java.sql.{Connection, DriverManager}
-import scala.io.Source
 
 
 // オペレータ本体
-class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
+class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) extends BaseOperator(_context) {
   private[this] val logger = LoggerFactory.getLogger(classOf[SnowOperator])
 
   override def runTask(): TaskResult = {
@@ -23,7 +23,9 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
     val pretty = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(config)
     logger.debug(pretty)
 
-    val source = Source.fromFile(config.get("_command", classOf[String]))
+    val command = config.get("_command", classOf[String])
+    val data = workspace.templateFile(templateEngine, command, UTF_8, config);
+
     val createTable = getOptionalParameterFromOperatorParameter(config, "create_table")
     val createOrReplaceTable = getOptionalParameterFromOperatorParameter(config, "create_or_replace_table")
     val createTableIfNotExists = getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists")
@@ -37,18 +39,17 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
       getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists"),
       getOptionalParameterFromOperatorParameter(config, "insert_into")
     ) match {
-      case (Some(table), _, _, _) => s"CREATE TABLE $table AS " + source.mkString
-      case (_, Some(table), _, _) => s"CREATE OR REPLACE TABLE $table AS " + source.mkString
-      case (_, _, Some(table), _) => s"CREATE TABLE $table IF NOT EXISTS AS " + source.mkString
-      case (_, _, _, Some(table)) => s"INSERT INTO $table " + source.mkString
-      case _ => source.mkString
+      case (Some(table), _, _, _) => s"CREATE TABLE $table AS " + data
+      case (_, Some(table), _, _) => s"CREATE OR REPLACE TABLE $table AS " + data
+      case (_, _, Some(table), _) => s"CREATE TABLE $table IF NOT EXISTS AS " + data
+      case (_, _, _, Some(table)) => s"INSERT INTO $table " + data
+      case _ => data
     }
-    source.close()
     logger.info(sql)
 
     val conn = getConnection(
-      getConfigFromOperatorParameterOrExportedParameter(config,"host"),
-      getConfigFromOperatorParameterOrExportedParameter(config,"user"),
+      getConfigFromOperatorParameterOrExportedParameter(config, "host"),
+      getConfigFromOperatorParameterOrExportedParameter(config, "user"),
       this.context.getSecrets.getSecret("snow.password"),
       getConfigFromOperatorParameterOrExportedParameterOptional(config, "database"),
       getConfigFromOperatorParameterOrExportedParameterOptional(config, "schema"),
@@ -80,7 +81,7 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
                      warehouse: Option[String],
                      role: Option[String],
                      unixtimeSetting: (Option[String], String),
-  ): Connection = {
+                   ): Connection = {
     DriverManager.registerDriver(
       new SnowflakeDriver()
     )
@@ -93,7 +94,7 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
     warehouse.foreach(x => prop.put("warehouse", x))
     role.foreach(x => prop.put("role", x))
     unixtimeSetting._1.foreach(x => prop.put("$" + x, unixtimeSetting._2))
-//    logger.debug(prop.toString)
+    //    logger.debug(prop.toString)
     try {
       DriverManager.getConnection(s"jdbc:snowflake://${host}", prop)
     } catch {
@@ -122,10 +123,11 @@ class SnowOperator(_context: OperatorContext) extends BaseOperator(_context) {
 }
 
 // オペレータを生成するファクトリクラス
-class SnowOperatorFactory extends OperatorFactory {
+class SnowOperatorFactory(
+                           templateEngine: TemplateEngine,
+                         ) extends OperatorFactory {
   // ↓ これがオペレータの名前になる
   override def getType: String = "snow"
 
-  override def newOperator(context: OperatorContext): Operator =
-    new SnowOperator(context)
+  override def newOperator(context: OperatorContext): Operator = new SnowOperator(context, templateEngine)
 }
