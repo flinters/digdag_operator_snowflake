@@ -11,6 +11,7 @@ _export:
         warehouse: compute_wh
         # schema: public
         session_unixtime_sql_variable_name: session_time
+    my_var: flinters
 
 +run_task:
     snow>: example.sql

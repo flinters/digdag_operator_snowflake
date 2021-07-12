@@ -24,14 +24,18 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     logger.debug(pretty)
 
     val command = config.get("_command", classOf[String])
-    val data = workspace.templateFile(templateEngine, command, UTF_8, config);
+    val data = try {
+      workspace.templateFile(templateEngine, command, UTF_8, config)
+    } catch {
+      case e: Throwable => throw new TaskExecutionException(e)
+    }
 
     val createTable = getOptionalParameterFromOperatorParameter(config, "create_table")
     val createOrReplaceTable = getOptionalParameterFromOperatorParameter(config, "create_or_replace_table")
     val createTableIfNotExists = getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists")
     val insertInto = getOptionalParameterFromOperatorParameter(config, "insert_into")
     if (Seq(createTable, createOrReplaceTable, createTableIfNotExists, insertInto).count(_.isDefined) >= 2) {
-      throw new RuntimeException("you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, insert_into)")
+      throw new TaskExecutionException("you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, insert_into)")
     }
     val sql = (
       getOptionalParameterFromOperatorParameter(config, "create_table"),
@@ -98,8 +102,8 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     try {
       DriverManager.getConnection(s"jdbc:snowflake://${host}", prop)
     } catch {
-      case e: SnowflakeSQLException =>
-        throw new RuntimeException(e)
+      case e: Throwable =>
+        throw new TaskExecutionException(e)
     }
   }
 

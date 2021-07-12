@@ -1,3 +1,4 @@
 SELECT
-   123234 as c,
-   $session_time as session_time
+    123234 as c,
+    $session_time as session_time,
+    '${my_var}'
