@@ -16,7 +16,7 @@ _export:
     repositories:
       - https://jitpack.io
     dependencies:
-      - com.github.flinters:digdag_operator_snowflake:0.1.3
+      - com.github.flinters:digdag_operator_snowflake:v0.1.3
   snow:
     host: zz99999.us-east-99.aws.snowflakecomputing.com
     # role: sysadmin
