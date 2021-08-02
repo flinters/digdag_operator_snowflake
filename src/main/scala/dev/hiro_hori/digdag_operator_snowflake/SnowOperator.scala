@@ -1,15 +1,15 @@
 package dev.hiro_hori.digdag_operator_snowflake
 
-import io.digdag.spi.{Operator, OperatorContext, OperatorFactory, TaskExecutionException, TaskResult, TemplateEngine}
-import io.digdag.util.BaseOperator
-import org.slf4j.LoggerFactory
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.digdag.client.config.Config
+import io.digdag.spi.*
+import io.digdag.util.BaseOperator
 import net.snowflake.client.jdbc.{SnowflakeDriver, SnowflakeSQLException}
+import org.slf4j.LoggerFactory
 
 import java.nio.charset.StandardCharsets.UTF_8
-import java.util.Properties
 import java.sql.{Connection, DriverManager}
+import java.util.Properties
 
 
 // オペレータ本体
@@ -30,18 +30,18 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       case e: Throwable => throw new TaskExecutionException(e)
     }
 
-    val createTable = getOptionalParameterFromOperatorParameter(config, "create_table")
-    val createOrReplaceTable = getOptionalParameterFromOperatorParameter(config, "create_or_replace_table")
-    val createTableIfNotExists = getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists")
-    val insertInto = getOptionalParameterFromOperatorParameter(config, "insert_into")
+    val createTable = config.getMaybeOperator("create_table")
+    val createOrReplaceTable = config.getMaybeOperator("create_or_replace_table")
+    val createTableIfNotExists = config.getMaybeOperator("create_table_if_not_exists")
+    val insertInto = config.getMaybeOperator("insert_into")
     if (Seq(createTable, createOrReplaceTable, createTableIfNotExists, insertInto).count(_.isDefined) >= 2) {
       throw new TaskExecutionException("you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, insert_into)")
     }
     val sql = (
-      getOptionalParameterFromOperatorParameter(config, "create_table"),
-      getOptionalParameterFromOperatorParameter(config, "create_or_replace_table"),
-      getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists"),
-      getOptionalParameterFromOperatorParameter(config, "insert_into")
+      config.getMaybeOperator("create_table"),
+      config.getMaybeOperator("create_or_replace_table"),
+      config.getMaybeOperator("create_table_if_not_exists"),
+      config.getMaybeOperator("insert_into")
     ) match {
       case (Some(table), _, _, _) => s"CREATE TABLE $table AS " + data
       case (_, Some(table), _, _) => s"CREATE OR REPLACE TABLE $table AS " + data
@@ -52,16 +52,16 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     logger.info(sql)
 
     val conn = getConnection(
-      getConfigFromOperatorParameterOrExportedParameter(config, "host"),
-      getConfigFromOperatorParameterOrExportedParameter(config, "user"),
+      config.getOperatorOrExported( "host"),
+      config.getOperatorOrExported("user"),
       this.context.getSecrets.getSecret("snow.password"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "database"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "schema"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "warehouse"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "role"),
+      config.getMaybeOperatorOrExported("database"),
+      config.getMaybeOperatorOrExported( "schema"),
+      config.getMaybeOperatorOrExported("warehouse"),
+      config.getMaybeOperatorOrExported("role"),
       (
-        getConfigFromOperatorParameterOrExportedParameterOptional(config, "session_unixtime_sql_variable_name"),
-        getConfigFromOperatorParameterOrExportedParameter(config, "session_unixtime"),
+        config.getMaybeOperatorOrExported( "session_unixtime_sql_variable_name"),
+        config.getOperatorOrExported( "session_unixtime"),
       )
     )
     val stmt = conn.createStatement()
@@ -110,22 +110,17 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     }
   }
 
-  def getOptionalParameterFromOperatorParameter(config: Config, configName: String): Option[String] =
-    Option(config.getOptional(configName, classOf[String]).orNull())
+  extension (config: Config) {
+    def getMaybeOperator(configName: String): Option[String] =
+      Option(config.getOptional(configName, classOf[String]).orNull())
 
-  def getConfigFromOperatorParameterOrExportedParameter(config: Config, configName: String): String =
-    Option(config.getOptional(configName, classOf[String]).orNull())
-      .getOrElse(config.getNested("snow").get(configName, classOf[String]))
+    def getOperatorOrExported(configName: String): String =
+      getMaybeOperator(configName)
+        .getOrElse(config.getNested("snow").get(configName, classOf[String]))
 
-  def getConfigFromOperatorParameterOrExportedParameterOptional(config: Config, configName: String): Option[String] = {
-
-    val o0: Option[String] = Option(config.getOptional(configName, classOf[String]).orNull())
-    val o1: Option[String] = Option(config.getNested("snow").getOptional(configName, classOf[String]).orNull())
-    if (o0.isDefined) {
-      o0
-    } else {
-      o1
-    }
+    def getMaybeOperatorOrExported(configName: String): Option[String] =
+      getMaybeOperator(configName)
+        .orElse(Option(config.getNested("snow").getOptional(configName, classOf[String]).orNull()))
   }
 }
 

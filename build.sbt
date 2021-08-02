@@ -1,6 +1,6 @@
 import Dependencies._
 
-ThisBuild / scalaVersion := "2.13.6"
+ThisBuild / scalaVersion := "3.0.1"
 ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / organization := "dev.hiro-hori"
 ThisBuild / organizationName := "hiro-hori"
@@ -15,6 +15,7 @@ lazy val root = (project in file("."))
     libraryDependencies ++= Seq(
       scalaTest % Test,
       "io.digdag" % "digdag-spi" % "0.9.42" % Provided,
+      "org.immutables" % "value" % "2.3.9" % Provided,
       "io.digdag" % "digdag-plugin-utils" % "0.9.42" % Provided,
       "net.snowflake" % "snowflake-jdbc" % "3.13.4",
     )
