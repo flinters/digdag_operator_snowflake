@@ -82,6 +82,6 @@ Artifacts are build on local repos: `~/.m2`.
 ### 2) run an example
 
 ```sh
-rm -rf .digdag/plugin 
+rm -rf .digdag/plugins 
 digdag run example.dig --session daily -a
 ```
