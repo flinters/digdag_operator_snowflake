@@ -23,6 +23,7 @@ _export:
     user: snow_user
     warehouse: compute_wh
     # schema: public
+    # query_tag: etl_task_for_xyz123
 
 +run_task:
   snow>: example.sql
@@ -44,6 +45,7 @@ parameter名|必須？|補足|設定可能箇所<br>snow>の直下|設定可能�
 `role`|x|Snowflakeの接続ロール名|o|o|x
 `warehouse`|x|演算が行われる、Snowflakeのウェアハウス名|o|o|x
 `database`|x|セッションに使われるデータベース|o|o|x
+`query_tag`|x|Snowflakeのクエリタグ名|o|o|x
 `schema`|x|セッションに使われるスキーマ|o|o|x
 `create_table`|x|クエリの冒頭にCREATE TABLE {table} AS を付与|o|x|x
 `create_or_replace_table`|x|クエリの冒頭にCREATE OR REPLACE TABLE {table} AS を付与|o|x|x
@@ -80,6 +82,6 @@ Artifacts are build on local repos: `~/.m2`.
 ### 2) run an example
 
 ```sh
-rm -rf .digdag/plugin 
+rm -rf .digdag/plugins 
 digdag run example.dig --session daily -a
 ```
