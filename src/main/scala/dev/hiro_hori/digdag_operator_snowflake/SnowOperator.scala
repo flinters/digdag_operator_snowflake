@@ -66,10 +66,9 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     )
     val stmt = conn.createStatement()
     try {
-      val queryTag = getConfigFromOperatorParameterOrExportedParameterOptional(config, "query_tag").orNull
-      if (queryTag != null) {
-        stmt.execute(s"alter session set QUERY_TAG = $queryTag")
-      }
+      val queryTag = getConfigFromOperatorParameterOrExportedParameterOptional(config, "query_tag")
+      queryTag.foreach(tag => stmt.execute(s"alter session set QUERY_TAG = $tag"))
+
       stmt.execute(sql)
       // オペレータの処理が無事成功した場合はTaskResultを返す
       TaskResult.empty(this.request)
