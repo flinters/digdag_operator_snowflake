@@ -11,7 +11,6 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.sql.{Connection, DriverManager}
 import java.util.Properties
 
-
 // オペレータ本体
 class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) extends BaseOperator(_context) {
   private[this] val logger = LoggerFactory.getLogger(classOf[SnowOperator])
@@ -24,44 +23,47 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     logger.debug(pretty)
 
     val command = config.get("_command", classOf[String])
-    val data = try {
-      workspace.templateFile(templateEngine, command, UTF_8, config)
-    } catch {
-      case e: Throwable => throw new TaskExecutionException(e)
-    }
+    val data =
+      try {
+        workspace.templateFile(templateEngine, command, UTF_8, config)
+      } catch {
+        case e: Throwable => throw new TaskExecutionException(e)
+      }
 
-    val createTable = config.getMaybeOperator("create_table")
-    val createOrReplaceTable = config.getMaybeOperator("create_or_replace_table")
-    val createTableIfNotExists = config.getMaybeOperator("create_table_if_not_exists")
-    val insertInto = config.getMaybeOperator("insert_into")
+    val createTable = config.getOptionString("create_table")
+    val createOrReplaceTable = config.getOptionString("create_or_replace_table")
+    val createTableIfNotExists = config.getOptionString("create_table_if_not_exists")
+    val insertInto = config.getOptionString("insert_into")
     if (Seq(createTable, createOrReplaceTable, createTableIfNotExists, insertInto).count(_.isDefined) >= 2) {
-      throw new TaskExecutionException("you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, insert_into)")
+      throw new TaskExecutionException(
+        "you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, insert_into)"
+      )
     }
     val sql = (
-      config.getMaybeOperator("create_table"),
-      config.getMaybeOperator("create_or_replace_table"),
-      config.getMaybeOperator("create_table_if_not_exists"),
-      config.getMaybeOperator("insert_into")
+      config.getOptionString("create_table"),
+      config.getOptionString("create_or_replace_table"),
+      config.getOptionString("create_table_if_not_exists"),
+      config.getOptionString("insert_into")
     ) match {
       case (Some(table), _, _, _) => s"CREATE TABLE $table AS " + data
       case (_, Some(table), _, _) => s"CREATE OR REPLACE TABLE $table AS " + data
       case (_, _, Some(table), _) => s"CREATE TABLE $table IF NOT EXISTS AS " + data
       case (_, _, _, Some(table)) => s"INSERT INTO $table " + data
-      case _ => data
+      case _                      => data
     }
     logger.info(sql)
 
     val conn = getConnection(
-      config.getOperatorOrExported( "host"),
-      config.getOperatorOrExported("user"),
+      config.getStringOrExported("host"),
+      config.getStringOrExported("user"),
       this.context.getSecrets.getSecret("snow.password"),
-      config.getMaybeOperatorOrExported("database"),
-      config.getMaybeOperatorOrExported( "schema"),
-      config.getMaybeOperatorOrExported("warehouse"),
-      config.getMaybeOperatorOrExported("role"),
+      config.getOptionStringOrExported("database"),
+      config.getOptionStringOrExported("schema"),
+      config.getOptionStringOrExported("warehouse"),
+      config.getOptionStringOrExported("role"),
       (
-        config.getMaybeOperatorOrExported( "session_unixtime_sql_variable_name"),
-        config.getOperatorOrExported( "session_unixtime"),
+        config.getOptionStringOrExported("session_unixtime_sql_variable_name"),
+        config.getStringOrExported("session_unixtime")
       )
     )
     val stmt = conn.createStatement()
@@ -80,15 +82,15 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
   }
 
   def getConnection(
-                     host: String,
-                     user: String,
-                     password: String,
-                     database: Option[String],
-                     schema: Option[String],
-                     warehouse: Option[String],
-                     role: Option[String],
-                     unixtimeSetting: (Option[String], String),
-                   ): Connection = {
+      host: String,
+      user: String,
+      password: String,
+      database: Option[String],
+      schema: Option[String],
+      warehouse: Option[String],
+      role: Option[String],
+      unixtimeSetting: (Option[String], String)
+  ): Connection = {
     DriverManager.registerDriver(
       new SnowflakeDriver()
     )
@@ -109,25 +111,12 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
         throw new TaskExecutionException(e)
     }
   }
-
-  extension (config: Config) {
-    def getMaybeOperator(configName: String): Option[String] =
-      Option(config.getOptional(configName, classOf[String]).orNull())
-
-    def getOperatorOrExported(configName: String): String =
-      getMaybeOperator(configName)
-        .getOrElse(config.getNested("snow").get(configName, classOf[String]))
-
-    def getMaybeOperatorOrExported(configName: String): Option[String] =
-      getMaybeOperator(configName)
-        .orElse(Option(config.getNested("snow").getOptional(configName, classOf[String]).orNull()))
-  }
 }
 
 // オペレータを生成するファクトリクラス
 class SnowOperatorFactory(
-                           templateEngine: TemplateEngine,
-                         ) extends OperatorFactory {
+    templateEngine: TemplateEngine
+) extends OperatorFactory {
   // ↓ これがオペレータの名前になる
   override def getType: String = "snow"
 
