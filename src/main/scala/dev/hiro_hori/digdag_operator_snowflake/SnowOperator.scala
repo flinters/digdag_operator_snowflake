@@ -21,7 +21,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     val config = this.request.getConfig
 
     // Configの内容をJSONのPrettyPrintで出力
-    val pretty = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(config)
+    val pretty = ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(config)
     logger.debug(pretty)
 
     val sql = getSql()
@@ -43,7 +43,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     catch {
       case NonFatal(e) =>
         if e.isInstanceOf[TaskExecutionException] then throw e
-        else throw new TaskExecutionException(e)
+        else throw TaskExecutionException(e)
     }
 
   private[this] def getSql(): String = {
@@ -55,7 +55,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     val insertInto = config.getOptionString("insert_into")
 
     if (Seq(createTable, createOrReplaceTable, createTableIfNotExists, insertInto).count(_.isDefined) >= 2) {
-      throw new TaskExecutionException(
+      throw TaskExecutionException(
         "you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, insert_into)"
       )
     }
@@ -104,11 +104,9 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       role: Option[String],
       unixtimeSetting: (Option[String], String)
   ): Connection = {
-    DriverManager.registerDriver(
-      new SnowflakeDriver()
-    )
+    DriverManager.registerDriver(SnowflakeDriver())
 
-    val prop = new Properties()
+    val prop = Properties()
     prop.put("user", user)
     prop.put("password", password)
     database.foreach(x => prop.put("db", x))
@@ -128,5 +126,5 @@ class SnowOperatorFactory(
   // ↓ これがオペレータの名前になる
   override def getType: String = "snow"
 
-  override def newOperator(context: OperatorContext): Operator = new SnowOperator(context, templateEngine)
+  override def newOperator(context: OperatorContext): Operator = SnowOperator(context, templateEngine)
 }

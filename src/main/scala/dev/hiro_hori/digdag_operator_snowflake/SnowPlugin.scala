@@ -11,5 +11,5 @@ class SnowPlugin extends Plugin {
 
 class SnowOperatorProvider @Inject() (templateEngine: TemplateEngine) extends OperatorProvider {
 
-  override def get(): util.List[OperatorFactory] = util.Arrays.asList(new SnowOperatorFactory(templateEngine))
+  override def get(): util.List[OperatorFactory] = util.Arrays.asList(SnowOperatorFactory(templateEngine))
 }
