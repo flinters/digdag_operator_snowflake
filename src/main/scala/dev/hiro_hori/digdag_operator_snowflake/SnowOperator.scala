@@ -10,53 +10,79 @@ import org.slf4j.LoggerFactory
 import java.nio.charset.StandardCharsets.UTF_8
 import java.sql.{Connection, DriverManager}
 import java.util.Properties
+import scala.util.Using
+import scala.util.control.NonFatal
 
 // オペレータ本体
 class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) extends BaseOperator(_context) {
   private[this] val logger = LoggerFactory.getLogger(classOf[SnowOperator])
 
-  override def runTask(): TaskResult = {
+  override def runTask(): TaskResult = wrapException {
     val config = this.request.getConfig
 
     // Configの内容をJSONのPrettyPrintで出力
     val pretty = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(config)
     logger.debug(pretty)
 
-    val command = config.get("_command", classOf[String])
-    val data =
-      try {
-        workspace.templateFile(templateEngine, command, UTF_8, config)
-      } catch {
-        case e: Throwable => throw new TaskExecutionException(e)
-      }
+    val sql = getSql()
+    val queryTag = config.getOptionStringOrExported("query_tag")
+
+    logger.info(sql)
+
+    Using.resource(getConnection()) { conn =>
+      val stmt = conn.createStatement()
+      queryTag.foreach(tag => stmt.execute(s"alter session set QUERY_TAG = $tag"))
+      stmt.execute(sql)
+      // オペレータの処理が無事成功した場合はTaskResultを返す
+      TaskResult.empty(this.request)
+    }
+  }
+
+  private[this] inline def wrapException[A](inline body: => A): A =
+    try body
+    catch {
+      case NonFatal(e) =>
+        if e.isInstanceOf[TaskExecutionException] then throw e
+        else throw new TaskExecutionException(e)
+    }
+
+  private[this] def getSql(): String = {
+    val config = this.request.getConfig
 
     val createTable = config.getOptionString("create_table")
     val createOrReplaceTable = config.getOptionString("create_or_replace_table")
     val createTableIfNotExists = config.getOptionString("create_table_if_not_exists")
     val insertInto = config.getOptionString("insert_into")
+
     if (Seq(createTable, createOrReplaceTable, createTableIfNotExists, insertInto).count(_.isDefined) >= 2) {
       throw new TaskExecutionException(
         "you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, insert_into)"
       )
     }
-    val sql = (
-      config.getOptionString("create_table"),
-      config.getOptionString("create_or_replace_table"),
-      config.getOptionString("create_table_if_not_exists"),
-      config.getOptionString("insert_into")
-    ) match {
-      case (Some(table), _, _, _) => s"CREATE TABLE $table AS " + data
-      case (_, Some(table), _, _) => s"CREATE OR REPLACE TABLE $table AS " + data
-      case (_, _, Some(table), _) => s"CREATE TABLE $table IF NOT EXISTS AS " + data
-      case (_, _, _, Some(table)) => s"INSERT INTO $table " + data
-      case _                      => data
-    }
-    logger.info(sql)
 
-    val conn = getConnection(
+    val data = getData()
+
+    createTable
+      .map(table => s"CREATE TABLE $table AS $data")
+      .orElse(createOrReplaceTable.map(table => s"CREATE OR REPLACE TABLE $table AS $data"))
+      .orElse(createTableIfNotExists.map(table => s"CREATE TABLE $table IF NOT EXISTS AS $data"))
+      .orElse(insertInto.map(table => s"INSERT INTO $table $data"))
+      .getOrElse(data)
+  }
+
+  private[this] def getData(): String = {
+    val config = this.request.getConfig
+    val command = config.getString("_command")
+    workspace.templateFile(templateEngine, command, UTF_8, config)
+  }
+
+  private[this] def getConnection(): Connection = {
+    val config = this.request.getConfig
+    val secretProvider = this.context.getSecrets
+    getConnection(
       config.getStringOrExported("host"),
       config.getStringOrExported("user"),
-      this.context.getSecrets.getSecret("snow.password"),
+      secretProvider.getSecret("snow.password"),
       config.getOptionStringOrExported("database"),
       config.getOptionStringOrExported("schema"),
       config.getOptionStringOrExported("warehouse"),
@@ -66,22 +92,9 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
         config.getStringOrExported("session_unixtime")
       )
     )
-    val stmt = conn.createStatement()
-    try {
-      val queryTag = getConfigFromOperatorParameterOrExportedParameterOptional(config, "query_tag")
-      queryTag.foreach(tag => stmt.execute(s"alter session set QUERY_TAG = $tag"))
-
-      stmt.execute(sql)
-      // オペレータの処理が無事成功した場合はTaskResultを返す
-      TaskResult.empty(this.request)
-    } catch {
-      case e: Throwable => throw new TaskExecutionException(e)
-    } finally {
-      conn.close()
-    }
   }
 
-  def getConnection(
+  private[this] def getConnection(
       host: String,
       user: String,
       password: String,
@@ -104,12 +117,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     role.foreach(x => prop.put("role", x))
     unixtimeSetting._1.foreach(x => prop.put("$" + x, unixtimeSetting._2))
     //    logger.debug(prop.toString)
-    try {
-      DriverManager.getConnection(s"jdbc:snowflake://${host}", prop)
-    } catch {
-      case e: Throwable =>
-        throw new TaskExecutionException(e)
-    }
+    DriverManager.getConnection(s"jdbc:snowflake://${host}", prop)
   }
 }
 
