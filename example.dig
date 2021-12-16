@@ -5,10 +5,11 @@ _export:
         dependencies:
             - dev.hiro-hori:digdag-operator-snowflake_2.13:0.1.0-SNAPSHOT
     snow:
-        host: zz99999.us-east-99.aws.snowflakecomputing.com
-        # role: sysadmin
-        user: snow_user
-        warehouse: compute_wh
+        host: rt69627.ap-northeast-1.aws.snowflakecomputing.com
+        role: PRECOG_DEVELOPER
+        # user: snow_user
+        user: HIROO.HORI
+        warehouse: PRECOG_HIROO_HORI
         # schema: public
         session_unixtime_sql_variable_name: session_time
     my_var: flinters
@@ -19,3 +20,4 @@ _export:
     schema: public
     create_or_replace_table: hogehoge
     query_tag: etl_task_for_xyz123
+    timezone: Asia/Tokyo
