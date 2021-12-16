@@ -59,6 +59,8 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       getConfigFromOperatorParameterOrExportedParameterOptional(config, "schema"),
       getConfigFromOperatorParameterOrExportedParameterOptional(config, "warehouse"),
       getConfigFromOperatorParameterOrExportedParameterOptional(config, "role"),
+      getConfigFromOperatorParameterOrExportedParameterOptional(config, "query_tag"),
+      getConfigFromOperatorParameterOrExportedParameterOptional(config, "timezone"),
       (
         getConfigFromOperatorParameterOrExportedParameterOptional(config, "session_unixtime_sql_variable_name"),
         getConfigFromOperatorParameterOrExportedParameter(config, "session_unixtime"),
@@ -66,9 +68,6 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     )
     val stmt = conn.createStatement()
     try {
-      val queryTag = getConfigFromOperatorParameterOrExportedParameterOptional(config, "query_tag")
-      queryTag.foreach(tag => stmt.execute(s"alter session set QUERY_TAG = $tag"))
-
       stmt.execute(sql)
       // オペレータの処理が無事成功した場合はTaskResultを返す
       TaskResult.empty(this.request)
@@ -87,6 +86,8 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
                      schema: Option[String],
                      warehouse: Option[String],
                      role: Option[String],
+                     queryTag: Option[String],
+                     timezone: Option[String],
                      unixtimeSetting: (Option[String], String),
                    ): Connection = {
     DriverManager.registerDriver(
@@ -100,6 +101,8 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     schema.foreach(x => prop.put("schema", x))
     warehouse.foreach(x => prop.put("warehouse", x))
     role.foreach(x => prop.put("role", x))
+    queryTag.foreach(x => prop.put("query_tag", x))
+    timezone.foreach(x => prop.put("timezone", x))
     unixtimeSetting._1.foreach(x => prop.put("$" + x, unixtimeSetting._2))
     //    logger.debug(prop.toString)
     try {
