@@ -19,3 +19,4 @@ _export:
     schema: public
     create_or_replace_table: hogehoge
     query_tag: etl_task_for_xyz123
+    timezone: Asia/Tokyo
