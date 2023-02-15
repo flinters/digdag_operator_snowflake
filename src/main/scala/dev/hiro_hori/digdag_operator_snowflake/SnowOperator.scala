@@ -160,7 +160,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     val ret = request.getConfig.getFactory.create()
     val lastQueryParam = ret.getNestedOrSetEmpty("snow").getNestedOrSetEmpty("last_query")
 
-    lastQueryParam.set("ids", queries.map(_.id))
+    lastQueryParam.set("ids", java.util.Arrays.asList(queries.map(_.id) :_*))
     lastQueryParam.set("query", sql)
     ret
   }
