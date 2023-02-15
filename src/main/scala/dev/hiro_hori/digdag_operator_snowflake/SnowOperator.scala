@@ -11,11 +11,14 @@ import org.slf4j.LoggerFactory
 import java.nio.charset.StandardCharsets.UTF_8
 import java.sql.{Connection, DriverManager}
 import java.util.Properties
+import scala.reflect.ClassTag
 
 
 // オペレータ本体
 class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) extends BaseOperator(_context) {
   private[this] val logger = LoggerFactory.getLogger(classOf[SnowOperator])
+
+  private[this] def classOfT[T: ClassTag]: Class[T] = implicitly[ClassTag[T]].runtimeClass.asInstanceOf[Class[T]]
 
   private[this] case class QueryResult(id: String)
 
@@ -32,10 +35,10 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       case e: Throwable => throw new TaskExecutionException(e)
     }
 
-    val createTable = getOptionalParameterFromOperatorParameter(config, "create_table")
-    val createOrReplaceTable = getOptionalParameterFromOperatorParameter(config, "create_or_replace_table")
-    val createTableIfNotExists = getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists")
-    val insertInto = getOptionalParameterFromOperatorParameter(config, "insert_into")
+    val createTable = getOptionalParameterFromOperatorParameter[String](config, "create_table")
+    val createOrReplaceTable = getOptionalParameterFromOperatorParameter[String](config, "create_or_replace_table")
+    val createTableIfNotExists = getOptionalParameterFromOperatorParameter[String](config, "create_table_if_not_exists")
+    val insertInto = getOptionalParameterFromOperatorParameter[String](config, "insert_into")
     if (Seq(createTable, createOrReplaceTable, createTableIfNotExists, insertInto).count(_.isDefined) >= 2) {
       throw new TaskExecutionException("you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, insert_into)")
     }
@@ -54,23 +57,23 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     logger.info(sql)
 
     val conn = getConnection(
-      getConfigFromOperatorParameterOrExportedParameter(config, "host"),
-      getConfigFromOperatorParameterOrExportedParameter(config, "user"),
+      getConfigFromOperatorParameterOrExportedParameter[String](config, "host"),
+      getConfigFromOperatorParameterOrExportedParameter[String](config, "user"),
       this.context.getSecrets.getSecret("snow.password"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "database"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "schema"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "warehouse"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "role"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "query_tag"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "timezone"),
+      getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "database"),
+      getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "schema"),
+      getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "warehouse"),
+      getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "role"),
+      getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "query_tag"),
+      getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "timezone"),
       (
-        getConfigFromOperatorParameterOrExportedParameterOptional(config, "session_unixtime_sql_variable_name"),
-        getConfigFromOperatorParameterOrExportedParameter(config, "session_unixtime"),
+        getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "session_unixtime_sql_variable_name"),
+        getConfigFromOperatorParameterOrExportedParameter[String](config, "session_unixtime"),
       )
     )
     val stmt = conn.createStatement()
     try {
-      if(getConfigFromOperatorParameterOrExportedParameterOptionalBoolean(config,"multi_queries").getOrElse(false)) {
+      if(getConfigFromOperatorParameterOrExportedParameterOptional[Boolean](config,"multi_queries").getOrElse(false)) {
         stmt.unwrap(classOf[SnowflakeStatement]).setParameter("MULTI_STATEMENT_COUNT", 0)
       }
 
@@ -134,28 +137,17 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     }
   }
 
-  def getOptionalParameterFromOperatorParameter(config: Config, configName: String): Option[String] =
-    Option(config.getOptional(configName, classOf[String]).orNull())
+  def getOptionalParameterFromOperatorParameter[T: ClassTag](config: Config, configName: String): Option[T] =
+    Option(config.getOptional(configName, classOfT[T]).orNull())
 
-  def getConfigFromOperatorParameterOrExportedParameter(config: Config, configName: String): String =
-    Option(config.getOptional(configName, classOf[String]).orNull())
-      .getOrElse(config.getNested("snow").get(configName, classOf[String]))
+  def getConfigFromOperatorParameterOrExportedParameter[T: ClassTag](config: Config, configName: String): T =
+    Option(config.getOptional(configName, classOfT[T]).orNull())
+      .getOrElse(config.getNested("snow").get(configName, classOfT[T]))
 
-  def getConfigFromOperatorParameterOrExportedParameterOptional(config: Config, configName: String): Option[String] = {
+  def getConfigFromOperatorParameterOrExportedParameterOptional[T: ClassTag](config: Config, configName: String): Option[T] = {
 
-    val o0: Option[String] = Option(config.getOptional(configName, classOf[String]).orNull())
-    val o1: Option[String] = Option(config.getNested("snow").getOptional(configName, classOf[String]).orNull())
-    if (o0.isDefined) {
-      o0
-    } else {
-      o1
-    }
-  }
-
-  def getConfigFromOperatorParameterOrExportedParameterOptionalBoolean(config: Config, configName: String): Option[Boolean] = {
-
-    val o0: Option[Boolean] = Option(config.getOptional(configName, classOf[Boolean]).orNull())
-    val o1: Option[Boolean] = Option(config.getNested("snow").getOptional(configName, classOf[Boolean]).orNull())
+    val o0: Option[T] = Option(config.getOptional(configName, classOfT[T]).orNull())
+    val o1: Option[T] = Option(config.getNested("snow").getOptional(configName, classOfT[T]).orNull())
     if (o0.isDefined) {
       o0
     } else {
