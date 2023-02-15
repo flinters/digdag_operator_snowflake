@@ -61,7 +61,7 @@ snow>の直下およびexportされた`snow.{parameter}`両方に設定可能な
 ### アウトプット一覧
 parameter名|
 ---|
-id|
+ids|
 query|
 
 ### `snow.password`シークレット設定例

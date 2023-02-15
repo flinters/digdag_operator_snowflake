@@ -5,7 +5,7 @@ import com.google.common.collect.ImmutableList
 import io.digdag.client.config.{Config, ConfigKey}
 import io.digdag.spi._
 import io.digdag.util.BaseOperator
-import net.snowflake.client.jdbc.{SnowflakeDriver, SnowflakeStatement}
+import net.snowflake.client.jdbc.{SnowflakeDriver, SnowflakeResultSet, SnowflakeStatement}
 import org.slf4j.LoggerFactory
 
 import java.nio.charset.StandardCharsets.UTF_8
@@ -17,7 +17,7 @@ import java.util.Properties
 class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) extends BaseOperator(_context) {
   private[this] val logger = LoggerFactory.getLogger(classOf[SnowOperator])
 
-  private[this] case class LastQuery(id: String, query: String)
+  private[this] case class QueryResult(id: String)
 
   override def runTask(): TaskResult = {
     val config = this.request.getConfig
@@ -70,10 +70,21 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     )
     val stmt = conn.createStatement()
     try {
+      stmt.unwrap(classOf[SnowflakeStatement]).setParameter("MULTI_STATEMENT_COUNT", 0)
+
       stmt.execute(sql)
 
-      val lastQuery = LastQuery(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID, sql)
-      val output: Config = buildLastQueryParam(lastQuery)
+      // @see https://docs.snowflake.com/en/user-guide/jdbc-using.html#multi-statement-support
+      // stmt.getMoreResultsは値がない場合など機能しない。そのため何個のクエリが実行されたか知る方法がなく、";"をカウントして代わりとした
+      val maxStmt = sql.count(_ ==';')
+      val queryResults = (0 to maxStmt).foldLeft(collection.mutable.Set(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))) {(list, _) =>
+        val result = stmt.getResultSet()
+        if(result != null)
+          list.add(QueryResult(result.unwrap(classOf[SnowflakeResultSet]).getQueryID))
+        stmt.getMoreResults
+        list
+      }.toList
+      val output: Config = buildOutputParam(sql, queryResults)
 
       val builder = TaskResult.defaultBuilder(request)
       builder.resetStoreParams(ImmutableList.of(ConfigKey.of("snow", "last_query")))
@@ -139,13 +150,13 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     }
   }
 
-  protected def buildLastQueryParam(lastQuery: LastQuery): Config =
+  protected def buildOutputParam(sql: String, queries: List[QueryResult]): Config =
   {
     val ret = request.getConfig.getFactory.create()
     val lastQueryParam = ret.getNestedOrSetEmpty("snow").getNestedOrSetEmpty("last_query")
 
-    lastQueryParam.set("id", lastQuery.id)
-    lastQueryParam.set("query", lastQuery.query)
+    lastQueryParam.set("ids", queries.map(_.id))
+    lastQueryParam.set("query", sql)
     ret
   }
 }
