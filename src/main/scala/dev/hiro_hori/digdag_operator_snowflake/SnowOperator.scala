@@ -1,20 +1,23 @@
 package dev.hiro_hori.digdag_operator_snowflake
 
-import io.digdag.spi.{Operator, OperatorContext, OperatorFactory, TaskExecutionException, TaskResult, TemplateEngine}
-import io.digdag.util.BaseOperator
-import org.slf4j.LoggerFactory
 import com.fasterxml.jackson.databind.ObjectMapper
-import io.digdag.client.config.Config
-import net.snowflake.client.jdbc.{SnowflakeDriver, SnowflakeSQLException}
+import com.google.common.collect.ImmutableList
+import io.digdag.client.config.{Config, ConfigKey}
+import io.digdag.spi._
+import io.digdag.util.BaseOperator
+import net.snowflake.client.jdbc.{SnowflakeDriver, SnowflakeStatement}
+import org.slf4j.LoggerFactory
 
 import java.nio.charset.StandardCharsets.UTF_8
-import java.util.Properties
 import java.sql.{Connection, DriverManager}
+import java.util.Properties
 
 
 // オペレータ本体
 class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) extends BaseOperator(_context) {
   private[this] val logger = LoggerFactory.getLogger(classOf[SnowOperator])
+
+  private[this] case class LastQuery(id: String, query: String)
 
   override def runTask(): TaskResult = {
     val config = this.request.getConfig
@@ -68,8 +71,14 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     val stmt = conn.createStatement()
     try {
       stmt.execute(sql)
-      // オペレータの処理が無事成功した場合はTaskResultを返す
-      TaskResult.empty(this.request)
+
+      val lastQuery = LastQuery(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID, sql)
+      val output: Config = buildLastQueryParam(lastQuery)
+
+      val builder = TaskResult.defaultBuilder(request)
+      builder.resetStoreParams(ImmutableList.of(ConfigKey.of("snow", "last_query")))
+      builder.storeParams(output)
+      builder.build()
     } catch {
       case e: Throwable => throw new TaskExecutionException(e)
     } finally {
@@ -128,6 +137,16 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     } else {
       o1
     }
+  }
+
+  protected def buildLastQueryParam(lastQuery: LastQuery): Config =
+  {
+    val ret = request.getConfig.getFactory.create()
+    val lastQueryParam = ret.getNestedOrSetEmpty("snow").getNestedOrSetEmpty("last_query")
+
+    lastQueryParam.set("id", lastQuery.id)
+    lastQueryParam.set("query", lastQuery.query)
+    ret
   }
 }
 
