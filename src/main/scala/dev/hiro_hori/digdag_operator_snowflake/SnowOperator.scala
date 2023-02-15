@@ -70,13 +70,15 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     )
     val stmt = conn.createStatement()
     try {
-      stmt.unwrap(classOf[SnowflakeStatement]).setParameter("MULTI_STATEMENT_COUNT", 0)
+      if(getConfigFromOperatorParameterOrExportedParameterOptionalBoolean(config,"multi_queries").getOrElse(false)) {
+        stmt.unwrap(classOf[SnowflakeStatement]).setParameter("MULTI_STATEMENT_COUNT", 0)
+      }
 
       stmt.execute(sql)
 
       // @see https://docs.snowflake.com/en/user-guide/jdbc-using.html#multi-statement-support
       // stmt.getMoreResultsは値がない場合など機能しない。そのため何個のクエリが実行されたか知る方法がなく、";"をカウントして代わりとした
-      val maxStmt = sql.count(_ ==';')
+      val maxStmt = sql.count(_ == ';')
       val queryResults = (0 to maxStmt).foldLeft(collection.mutable.Set(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))) {(list, _) =>
         val result = stmt.getResultSet()
         if(result != null)
@@ -143,6 +145,17 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
 
     val o0: Option[String] = Option(config.getOptional(configName, classOf[String]).orNull())
     val o1: Option[String] = Option(config.getNested("snow").getOptional(configName, classOf[String]).orNull())
+    if (o0.isDefined) {
+      o0
+    } else {
+      o1
+    }
+  }
+
+  def getConfigFromOperatorParameterOrExportedParameterOptionalBoolean(config: Config, configName: String): Option[Boolean] = {
+
+    val o0: Option[Boolean] = Option(config.getOptional(configName, classOf[Boolean]).orNull())
+    val o1: Option[Boolean] = Option(config.getNested("snow").getOptional(configName, classOf[Boolean]).orNull())
     if (o0.isDefined) {
       o0
     } else {
