@@ -47,6 +47,7 @@ parameter名|必須？|補足|設定可能箇所<br>snow>の直下|設定可能�
 `warehouse`|x|演算が行われる、Snowflakeのウェアハウス名|o|o|x
 `database`|x|セッションに使われるデータベース|o|o|x
 `schema`|x|セッションに使われるスキーマ|o|o|x
+`query`|x|ファイルではなくクエリを直接記載|o|x|x
 `query_tag`|x|Snowflakeのクエリタグ名|o|o|x
 `timezone`|x|セッションに使われるTIMEZONE|o|o|x
 `create_table`|x|クエリの冒頭にCREATE TABLE {table} AS を付与|o|x|x
@@ -86,4 +87,14 @@ Artifacts are build on local repos: `~/.m2`.
 ```sh
 rm -rf .digdag/plugins 
 digdag run example.dig --session daily -a
+```
+
+### 3) debug an example on intellij
+
+```bash
+ JAR Application
+ Path to JAR: /user/local/bin/digdag
+ Program arguments: run example.dig --no-save --session daily -a
+ Working directory: /Users/h_hori/projects/digdag_operator_snowflake
+ Before Launch: sbt publishM2 && rm -rf .digdag/plugins
 ```

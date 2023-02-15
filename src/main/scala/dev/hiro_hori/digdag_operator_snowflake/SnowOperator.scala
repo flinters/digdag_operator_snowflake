@@ -23,9 +23,8 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     val pretty = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(config)
     logger.debug(pretty)
 
-    val command = config.get("_command", classOf[String])
     val data = try {
-      workspace.templateFile(templateEngine, command, UTF_8, config)
+      workspace.templateCommand(templateEngine, config, "query", UTF_8)
     } catch {
       case e: Throwable => throw new TaskExecutionException(e)
     }
@@ -38,10 +37,10 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       throw new TaskExecutionException("you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, insert_into)")
     }
     val sql = (
-      getOptionalParameterFromOperatorParameter(config, "create_table"),
-      getOptionalParameterFromOperatorParameter(config, "create_or_replace_table"),
-      getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists"),
-      getOptionalParameterFromOperatorParameter(config, "insert_into")
+      createTable,
+      createOrReplaceTable,
+      createTableIfNotExists,
+      insertInto
     ) match {
       case (Some(table), _, _, _) => s"CREATE TABLE $table AS " + data
       case (_, Some(table), _, _) => s"CREATE OR REPLACE TABLE $table AS " + data
