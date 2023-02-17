@@ -84,14 +84,14 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       // しかし getMoreResults 以外に statement をイテレーションする手段が見つけられませんでした。
       // そのため実行されたクエリ数を正確に数える手段がなく、";"をカウントして代わりとしています。
       val maxStmt = sql.count(_ == ';')
-      val queryResults = (0 to maxStmt).foldLeft(collection.mutable.Set(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))) {(set, _) =>
+      val queryResults = collection.mutable.Set(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))
+      for (_ <- 0 to maxStmt) {
         val result = stmt.getResultSet()
         if(result != null)
-          set.add(QueryResult(result.unwrap(classOf[SnowflakeResultSet]).getQueryID))
+          queryResults.add(QueryResult(result.unwrap(classOf[SnowflakeResultSet]).getQueryID))
         stmt.getMoreResults
-        set
-      }.toList
-      val output: Config = buildOutputParam(sql, queryResults)
+      }
+      val output: Config = buildOutputParam(sql, queryResults.toList)
 
       val builder = TaskResult.defaultBuilder(request)
       builder.resetStoreParams(ImmutableList.of(ConfigKey.of("snow", "last_query")))
