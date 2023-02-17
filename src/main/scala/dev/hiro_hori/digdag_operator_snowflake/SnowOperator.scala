@@ -82,8 +82,8 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       // @see https://docs.snowflake.com/en/user-guide/jdbc-using.html#multi-statement-support
       // stmt.getMoreResultsは、CREATE TABLE 文などで false を返します。
       // しかし getMoreResults 以外に statement をイテレーションする手段が見つけられませんでした。
-      // そのため実行されたクエリ数を正確に数える手段がなく、";"をカウントして代わりとしています。
-      // 正確なstatementを数えられないので、loopは可能性のあるstatement数の最大分を回し、さらに重複して抽出したstatementは排除するという考えのもと実装しています。
+      // そのため実行されたstatement数を正確に数える手段がなく、";"をカウントして代わりとしています。
+      // 正確なstatement数がわからないので、loopは可能性のあるstatement数の最大分を回し、さらに重複して抽出したstatementは排除するという考えのもと実装しています。
       val maxStmt = sql.count(_ == ';') + 1
       val queryResults = collection.mutable.Set(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))
       for (_ <- 0 until maxStmt) {
