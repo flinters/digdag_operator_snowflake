@@ -82,12 +82,12 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       // @see https://docs.snowflake.com/en/user-guide/jdbc-using.html#multi-statement-support
       // stmt.getMoreResultsは値がない場合など機能しない。そのため何個のクエリが実行されたか知る方法がなく、";"をカウントして代わりとした
       val maxStmt = sql.count(_ == ';')
-      val queryResults = (0 to maxStmt).foldLeft(collection.mutable.Set(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))) {(list, _) =>
+      val queryResults = (0 to maxStmt).foldLeft(collection.mutable.Set(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))) {(set, _) =>
         val result = stmt.getResultSet()
         if(result != null)
-          list.add(QueryResult(result.unwrap(classOf[SnowflakeResultSet]).getQueryID))
+          set.add(QueryResult(result.unwrap(classOf[SnowflakeResultSet]).getQueryID))
         stmt.getMoreResults
-        list
+        set
       }.toList
       val output: Config = buildOutputParam(sql, queryResults)
 
@@ -155,7 +155,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     }
   }
 
-  protected def buildOutputParam(sql: String, queries: List[QueryResult]): Config =
+  def buildOutputParam(sql: String, queries: List[QueryResult]): Config =
   {
     val ret = request.getConfig.getFactory.create()
     val lastQueryParam = ret.getNestedOrSetEmpty("snow").getNestedOrSetEmpty("last_query")
