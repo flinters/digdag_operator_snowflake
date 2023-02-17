@@ -73,7 +73,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     )
     val stmt = conn.createStatement()
     try {
-      if(getConfigFromOperatorParameterOrExportedParameterOptional[Boolean](config,"multi_queries").getOrElse(false)) {
+      if(getConfigFromOperatorParameterOrExportedParameterOptional[Boolean](config, "multi_queries").getOrElse(false)) {
         stmt.unwrap(classOf[SnowflakeStatement]).setParameter("MULTI_STATEMENT_COUNT", 0)
       }
 
@@ -83,9 +83,10 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       // stmt.getMoreResultsは、CREATE TABLE 文などで false を返します。
       // しかし getMoreResults 以外に statement をイテレーションする手段が見つけられませんでした。
       // そのため実行されたクエリ数を正確に数える手段がなく、";"をカウントして代わりとしています。
-      val maxStmt = sql.count(_ == ';')
+      // 正確なstatementを数えられないので、loopは可能性のあるstatement数の最大分を回し、さらに重複して抽出したstatementは排除するという考えのもと実装しています。
+      val maxStmt = sql.count(_ == ';') + 1
       val queryResults = collection.mutable.Set(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))
-      for (_ <- 0 to maxStmt) {
+      for (_ <- 0 until maxStmt) {
         val result = stmt.getResultSet()
         if(result != null)
           queryResults.add(QueryResult(result.unwrap(classOf[SnowflakeResultSet]).getQueryID))
