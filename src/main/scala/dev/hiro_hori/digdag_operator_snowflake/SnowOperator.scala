@@ -80,7 +80,9 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       stmt.execute(sql)
 
       // @see https://docs.snowflake.com/en/user-guide/jdbc-using.html#multi-statement-support
-      // stmt.getMoreResultsは値がない場合など機能しない。そのため何個のクエリが実行されたか知る方法がなく、";"をカウントして代わりとした
+      // stmt.getMoreResultsは、CREATE TABLE 文などで false を返します。
+      // しかし getMoreResults 以外に statement をイテレーションする手段が見つけられませんでした。
+      // そのため実行されたクエリ数を正確に数える手段がなく、";"をカウントして代わりとしています。
       val maxStmt = sql.count(_ == ';')
       val queryResults = (0 to maxStmt).foldLeft(collection.mutable.Set(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))) {(set, _) =>
         val result = stmt.getResultSet()
