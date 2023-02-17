@@ -104,7 +104,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     }
   }
 
-  def getConnection(
+  private def getConnection(
                      host: String,
                      user: String,
                      password: String,
@@ -139,14 +139,14 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     }
   }
 
-  def getOptionalParameterFromOperatorParameter[T: ClassTag](config: Config, configName: String): Option[T] =
+  private def getOptionalParameterFromOperatorParameter[T: ClassTag](config: Config, configName: String): Option[T] =
     Option(config.getOptional(configName, classOfT[T]).orNull())
 
-  def getConfigFromOperatorParameterOrExportedParameter[T: ClassTag](config: Config, configName: String): T =
+  private def getConfigFromOperatorParameterOrExportedParameter[T: ClassTag](config: Config, configName: String): T =
     Option(config.getOptional(configName, classOfT[T]).orNull())
       .getOrElse(config.getNested("snow").get(configName, classOfT[T]))
 
-  def getConfigFromOperatorParameterOrExportedParameterOptional[T: ClassTag](config: Config, configName: String): Option[T] = {
+  private def getConfigFromOperatorParameterOrExportedParameterOptional[T: ClassTag](config: Config, configName: String): Option[T] = {
 
     val o0: Option[T] = Option(config.getOptional(configName, classOfT[T]).orNull())
     val o1: Option[T] = Option(config.getNested("snow").getOptional(configName, classOfT[T]).orNull())
@@ -157,7 +157,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     }
   }
 
-  def buildOutputParam(sql: String, queries: List[QueryResult]): Config =
+  private def buildOutputParam(sql: String, queries: List[QueryResult]): Config =
   {
     val ret = request.getConfig.getFactory.create()
     val lastQueryParam = ret.getNestedOrSetEmpty("snow").getNestedOrSetEmpty("last_query")
