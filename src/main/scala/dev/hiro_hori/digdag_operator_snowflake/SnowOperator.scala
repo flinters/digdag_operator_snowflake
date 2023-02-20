@@ -1,20 +1,26 @@
 package dev.hiro_hori.digdag_operator_snowflake
 
-import io.digdag.spi.{Operator, OperatorContext, OperatorFactory, TaskExecutionException, TaskResult, TemplateEngine}
-import io.digdag.util.BaseOperator
-import org.slf4j.LoggerFactory
 import com.fasterxml.jackson.databind.ObjectMapper
-import io.digdag.client.config.Config
-import net.snowflake.client.jdbc.{SnowflakeDriver, SnowflakeSQLException}
+import com.google.common.collect.ImmutableList
+import io.digdag.client.config.{Config, ConfigKey}
+import io.digdag.spi._
+import io.digdag.util.BaseOperator
+import net.snowflake.client.jdbc.{SnowflakeDriver, SnowflakeResultSet, SnowflakeStatement}
+import org.slf4j.LoggerFactory
 
 import java.nio.charset.StandardCharsets.UTF_8
-import java.util.Properties
 import java.sql.{Connection, DriverManager}
+import java.util.Properties
+import scala.reflect.ClassTag
 
 
 // オペレータ本体
 class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) extends BaseOperator(_context) {
   private[this] val logger = LoggerFactory.getLogger(classOf[SnowOperator])
+
+  private[this] def classOfT[T: ClassTag]: Class[T] = implicitly[ClassTag[T]].runtimeClass.asInstanceOf[Class[T]]
+
+  private[this] case class QueryResult(id: String)
 
   override def runTask(): TaskResult = {
     val config = this.request.getConfig
@@ -23,25 +29,24 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     val pretty = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(config)
     logger.debug(pretty)
 
-    val command = config.get("_command", classOf[String])
     val data = try {
-      workspace.templateFile(templateEngine, command, UTF_8, config)
+      workspace.templateCommand(templateEngine, config, "query", UTF_8)
     } catch {
       case e: Throwable => throw new TaskExecutionException(e)
     }
 
-    val createTable = getOptionalParameterFromOperatorParameter(config, "create_table")
-    val createOrReplaceTable = getOptionalParameterFromOperatorParameter(config, "create_or_replace_table")
-    val createTableIfNotExists = getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists")
-    val insertInto = getOptionalParameterFromOperatorParameter(config, "insert_into")
+    val createTable = getOptionalParameterFromOperatorParameter[String](config, "create_table")
+    val createOrReplaceTable = getOptionalParameterFromOperatorParameter[String](config, "create_or_replace_table")
+    val createTableIfNotExists = getOptionalParameterFromOperatorParameter[String](config, "create_table_if_not_exists")
+    val insertInto = getOptionalParameterFromOperatorParameter[String](config, "insert_into")
     if (Seq(createTable, createOrReplaceTable, createTableIfNotExists, insertInto).count(_.isDefined) >= 2) {
       throw new TaskExecutionException("you must specify only 1 option in (create_table, create_or_replace_table, create_table_if_not_exists, insert_into)")
     }
     val sql = (
-      getOptionalParameterFromOperatorParameter(config, "create_table"),
-      getOptionalParameterFromOperatorParameter(config, "create_or_replace_table"),
-      getOptionalParameterFromOperatorParameter(config, "create_table_if_not_exists"),
-      getOptionalParameterFromOperatorParameter(config, "insert_into")
+      createTable,
+      createOrReplaceTable,
+      createTableIfNotExists,
+      insertInto
     ) match {
       case (Some(table), _, _, _) => s"CREATE TABLE $table AS " + data
       case (_, Some(table), _, _) => s"CREATE OR REPLACE TABLE $table AS " + data
@@ -52,25 +57,47 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     logger.info(sql)
 
     val conn = getConnection(
-      getConfigFromOperatorParameterOrExportedParameter(config, "host"),
-      getConfigFromOperatorParameterOrExportedParameter(config, "user"),
+      getConfigFromOperatorParameterOrExportedParameter[String](config, "host"),
+      getConfigFromOperatorParameterOrExportedParameter[String](config, "user"),
       this.context.getSecrets.getSecret("snow.password"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "database"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "schema"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "warehouse"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "role"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "query_tag"),
-      getConfigFromOperatorParameterOrExportedParameterOptional(config, "timezone"),
+      getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "database"),
+      getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "schema"),
+      getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "warehouse"),
+      getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "role"),
+      getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "query_tag"),
+      getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "timezone"),
       (
-        getConfigFromOperatorParameterOrExportedParameterOptional(config, "session_unixtime_sql_variable_name"),
-        getConfigFromOperatorParameterOrExportedParameter(config, "session_unixtime"),
+        getConfigFromOperatorParameterOrExportedParameterOptional[String](config, "session_unixtime_sql_variable_name"),
+        getConfigFromOperatorParameterOrExportedParameter[String](config, "session_unixtime"),
       )
     )
     val stmt = conn.createStatement()
     try {
+      if(getConfigFromOperatorParameterOrExportedParameterOptional[Boolean](config, "multi_queries").getOrElse(false)) {
+        stmt.unwrap(classOf[SnowflakeStatement]).setParameter("MULTI_STATEMENT_COUNT", 0)
+      }
+
       stmt.execute(sql)
-      // オペレータの処理が無事成功した場合はTaskResultを返す
-      TaskResult.empty(this.request)
+
+      // @see https://docs.snowflake.com/en/user-guide/jdbc-using.html#multi-statement-support
+      // stmt.getMoreResultsは、CREATE TABLE 文などで false を返します。
+      // しかし getMoreResults 以外に statement をイテレーションする手段が見つけられませんでした。
+      // そのため実行されたstatement数を正確に数える手段がなく、";"をカウントして代わりとしています。
+      // 正確なstatement数がわからないので、loopは可能性のあるstatement数の最大分を回し、さらに重複して抽出したstatementは排除するという考えのもと実装しています。
+      val maxStmt = sql.count(_ == ';') + 1
+      val queryResults = collection.mutable.Set(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))
+      for (_ <- 0 until maxStmt) {
+        val result = stmt.getResultSet()
+        if(result != null)
+          queryResults.add(QueryResult(result.unwrap(classOf[SnowflakeResultSet]).getQueryID))
+        stmt.getMoreResults
+      }
+      val output: Config = buildOutputParam(sql, queryResults.toList)
+
+      val builder = TaskResult.defaultBuilder(request)
+      builder.resetStoreParams(ImmutableList.of(ConfigKey.of("snow", "last_query")))
+      builder.storeParams(output)
+      builder.build()
     } catch {
       case e: Throwable => throw new TaskExecutionException(e)
     } finally {
@@ -78,7 +105,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     }
   }
 
-  def getConnection(
+  private def getConnection(
                      host: String,
                      user: String,
                      password: String,
@@ -113,22 +140,32 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     }
   }
 
-  def getOptionalParameterFromOperatorParameter(config: Config, configName: String): Option[String] =
-    Option(config.getOptional(configName, classOf[String]).orNull())
+  private def getOptionalParameterFromOperatorParameter[T: ClassTag](config: Config, configName: String): Option[T] =
+    Option(config.getOptional(configName, classOfT[T]).orNull())
 
-  def getConfigFromOperatorParameterOrExportedParameter(config: Config, configName: String): String =
-    Option(config.getOptional(configName, classOf[String]).orNull())
-      .getOrElse(config.getNested("snow").get(configName, classOf[String]))
+  private def getConfigFromOperatorParameterOrExportedParameter[T: ClassTag](config: Config, configName: String): T =
+    Option(config.getOptional(configName, classOfT[T]).orNull())
+      .getOrElse(config.getNested("snow").get(configName, classOfT[T]))
 
-  def getConfigFromOperatorParameterOrExportedParameterOptional(config: Config, configName: String): Option[String] = {
+  private def getConfigFromOperatorParameterOrExportedParameterOptional[T: ClassTag](config: Config, configName: String): Option[T] = {
 
-    val o0: Option[String] = Option(config.getOptional(configName, classOf[String]).orNull())
-    val o1: Option[String] = Option(config.getNested("snow").getOptional(configName, classOf[String]).orNull())
+    val o0: Option[T] = Option(config.getOptional(configName, classOfT[T]).orNull())
+    val o1: Option[T] = Option(config.getNested("snow").getOptional(configName, classOfT[T]).orNull())
     if (o0.isDefined) {
       o0
     } else {
       o1
     }
+  }
+
+  private def buildOutputParam(sql: String, queries: List[QueryResult]): Config =
+  {
+    val ret = request.getConfig.getFactory.create()
+    val lastQueryParam = ret.getNestedOrSetEmpty("snow").getNestedOrSetEmpty("last_query")
+
+    lastQueryParam.set("ids", java.util.Arrays.asList(queries.map(_.id) :_*))
+    lastQueryParam.set("query", sql)
+    ret
   }
 }
 

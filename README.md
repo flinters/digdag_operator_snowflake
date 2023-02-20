@@ -47,6 +47,7 @@ parameter名|必須？|補足|設定可能箇所<br>snow>の直下|設定可能�
 `warehouse`|x|演算が行われる、Snowflakeのウェアハウス名|o|o|x
 `database`|x|セッションに使われるデータベース|o|o|x
 `schema`|x|セッションに使われるスキーマ|o|o|x
+`query`|x|クエリを直接記載|o|x|x
 `query_tag`|x|Snowflakeのクエリタグ名|o|o|x
 `timezone`|x|セッションに使われるTIMEZONE|o|o|x
 `create_table`|x|クエリの冒頭にCREATE TABLE {table} AS を付与|o|x|x
@@ -54,8 +55,15 @@ parameter名|必須？|補足|設定可能箇所<br>snow>の直下|設定可能�
 `create_table_if_not_exists`|x|クエリの冒頭にCREATE TABLE {table} IF NOT EXISTS AS を付与|o|x|x
 `insert_into`|x|クエリの冒頭にINSERT INTO {table} AS を付与|o|x|x
 `session_unixtime_sql_variable_name`|x|digdagのsession_unixtimeを、Snowflake SQL変数にsetする。その際の変数名|o|o|x
+`multi_queries`|x|複数のクエリを実行可にする(true|false). SQLインジェクションを受ける可能性が高くなるため使用には注意|o|o|x
 
 snow>の直下およびexportされた`snow.{parameter}`両方に設定可能なパラメータが、両方に設定されていた場合は、snow>の直下に設定された値を優先して使用する
+
+### アウトプット一覧
+parameter名|
+---|
+ids|
+query|
 
 ### `snow.password`シークレット設定例
 
@@ -86,4 +94,14 @@ Artifacts are build on local repos: `~/.m2`.
 ```sh
 rm -rf .digdag/plugins 
 digdag run example.dig --session daily -a
+```
+
+### 3) debug an example on intellij
+
+```bash
+ JAR Application
+ Path to JAR: /user/local/bin/digdag
+ Program arguments: run example.dig --no-save --session daily -a
+ Working directory: /Users/h_hori/projects/digdag_operator_snowflake
+ Before Launch: sbt publishM2 && rm -rf .digdag/plugins
 ```
