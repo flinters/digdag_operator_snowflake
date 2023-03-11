@@ -1,8 +1,8 @@
 package dev.hiro_hori.digdag_operator_snowflake
 
-import java.util
 import io.digdag.spi.{OperatorFactory, OperatorProvider, Plugin, TemplateEngine}
 
+import java.util
 import javax.inject.Inject
 class SnowPlugin extends Plugin {
   override def getServiceProvider[T](`type`: Class[T]): Class[_ <: T] =

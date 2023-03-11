@@ -56,6 +56,7 @@ parameter名|必須？|補足|設定可能箇所<br>snow>の直下|設定可能�
 `insert_into`|x|クエリの冒頭にINSERT INTO {table} AS を付与|o|x|x
 `session_unixtime_sql_variable_name`|x|digdagのsession_unixtimeを、Snowflake SQL変数にsetする。その際の変数名|o|o|x
 `multi_queries`|x|複数のクエリを実行可にする(true&#124;false). SQLインジェクションを受ける可能性が高くなるため使用には注意|o|o|x
+`store_last_results`|x|クエリ結果の最初の1行を ${snow.last_results}変数に格納する(true&#124;false)|o|x|x
 
 snow>の直下およびexportされた`snow.{parameter}`両方に設定可能なパラメータが、両方に設定されていた場合は、snow>の直下に設定された値を優先して使用する
 
