@@ -95,7 +95,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       for (_ <- 0 until maxStmt) {
         val result = stmt.getResultSet()
         if (result != null) {
-          if (is_store_last_results) store = buildStoreParam(result)
+          if (is_store_last_results && !result.isClosed) store = buildStoreParam(result)
           queryResults.add(QueryResult(result.unwrap(classOf[SnowflakeResultSet]).getQueryID))
         }
         stmt.getMoreResults
