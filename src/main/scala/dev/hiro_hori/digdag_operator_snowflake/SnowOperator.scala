@@ -73,10 +73,10 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     )
     val stmt = conn.createStatement()
     try {
-      val is_multi_queries = getConfigFromOperatorParameterOrExportedParameterOptional[Boolean](config, "multi_queries").getOrElse(false)
-      val is_store_last_results = getOptionalParameterFromOperatorParameter[Boolean](config, "store_last_results").getOrElse(false)
+      val multiQueries = getConfigFromOperatorParameterOrExportedParameterOptional[Boolean](config, "multi_queries").getOrElse(false)
+      val storeLastResults = getOptionalParameterFromOperatorParameter[Boolean](config, "store_last_results").getOrElse(false)
 
-      if(is_multi_queries) {
+      if(multiQueries) {
         stmt.unwrap(classOf[SnowflakeStatement]).setParameter("MULTI_STATEMENT_COUNT", 0)
       }
 
@@ -95,14 +95,14 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       for (_ <- 0 until maxStmt) {
         val result = stmt.getResultSet()
         if (result != null) {
-          if (is_store_last_results && !result.isClosed) store = buildStoreParam(result)
+          if (storeLastResults && !result.isClosed) store = buildStoreParam(result)
           queryResults.add(QueryResult(result.unwrap(classOf[SnowflakeResultSet]).getQueryID))
         }
         stmt.getMoreResults
       }
       if (queryResults.isEmpty) { // 全statementにSELECT文が一つもない場合
         queryResults.add(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))
-        if (is_store_last_results) store.getNestedOrSetEmpty("snow").getNestedOrSetEmpty("last_results")
+        if (storeLastResults) store.getNestedOrSetEmpty("snow").getNestedOrSetEmpty("last_results")
       }
       val output = buildOutputParam(sql, queryResults.toList)
 
