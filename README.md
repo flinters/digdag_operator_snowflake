@@ -61,9 +61,9 @@ parameter名|必須？|補足|設定可能箇所<br>snow>の直下|設定可能�
 snow>の直下およびexportされた`snow.{parameter}`両方に設定可能なパラメータが、両方に設定されていた場合は、snow>の直下に設定された値を優先して使用する
 
 ### アウトプット一覧
-parameter名|
----|
-ids|
+parameter名|補足
+---|---
+ids|最初の1文および、SELECT文のみIDが取得できます。(CREATE文やINSERT文などはID取得できません。)
 query|
 
 ### `snow.password`シークレット設定例
