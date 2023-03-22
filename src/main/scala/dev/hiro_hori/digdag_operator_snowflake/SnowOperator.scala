@@ -9,7 +9,7 @@ import net.snowflake.client.jdbc.{SnowflakeDriver, SnowflakeResultSet, Snowflake
 import org.slf4j.LoggerFactory
 
 import java.nio.charset.StandardCharsets.UTF_8
-import java.sql.{Connection, DriverManager}
+import java.sql.{Connection, DriverManager, ResultSet}
 import java.util.Properties
 import scala.reflect.ClassTag
 
@@ -73,7 +73,10 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     )
     val stmt = conn.createStatement()
     try {
-      if(getConfigFromOperatorParameterOrExportedParameterOptional[Boolean](config, "multi_queries").getOrElse(false)) {
+      val multiQueries = getConfigFromOperatorParameterOrExportedParameterOptional[Boolean](config, "multi_queries").getOrElse(false)
+      val storeLastResults = getOptionalParameterFromOperatorParameter[Boolean](config, "store_last_results").getOrElse(false)
+
+      if(multiQueries) {
         stmt.unwrap(classOf[SnowflakeStatement]).setParameter("MULTI_STATEMENT_COUNT", 0)
       }
 
@@ -85,18 +88,28 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       // そのため実行されたstatement数を正確に数える手段がなく、";"をカウントして代わりとしています。
       // 正確なstatement数がわからないので、loopは可能性のあるstatement数の最大分を回し、さらに重複して抽出したstatementは排除するという考えのもと実装しています。
       val maxStmt = sql.count(_ == ';') + 1
-      val queryResults = collection.mutable.Set(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))
+      val queryResults = collection.mutable.Set[QueryResult]()
+
+      var store = request.getConfig.getFactory.create()
+
       for (_ <- 0 until maxStmt) {
         val result = stmt.getResultSet()
-        if(result != null)
+        if (result != null) {
+          if (storeLastResults && !result.isClosed) store = buildStoreParam(result)
           queryResults.add(QueryResult(result.unwrap(classOf[SnowflakeResultSet]).getQueryID))
+        }
         stmt.getMoreResults
       }
-      val output: Config = buildOutputParam(sql, queryResults.toList)
+      if (queryResults.isEmpty) { // 全statementにSELECT文が一つもない場合
+        queryResults.add(QueryResult(stmt.unwrap(classOf[SnowflakeStatement]).getQueryID))
+        if (storeLastResults) store.getNestedOrSetEmpty("snow").getNestedOrSetEmpty("last_results")
+      }
+      val output = buildOutputParam(sql, queryResults.toList)
 
       val builder = TaskResult.defaultBuilder(request)
       builder.resetStoreParams(ImmutableList.of(ConfigKey.of("snow", "last_query")))
-      builder.storeParams(output)
+      builder.resetStoreParams(ImmutableList.of(ConfigKey.of("snow", "last_result")))
+      builder.storeParams(output.merge(store))
       builder.build()
     } catch {
       case e: Throwable => throw new TaskExecutionException(e)
@@ -158,13 +171,27 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     }
   }
 
-  private def buildOutputParam(sql: String, queries: List[QueryResult]): Config =
-  {
+  private def buildOutputParam(sql: String, queries: List[QueryResult]): Config = {
     val ret = request.getConfig.getFactory.create()
     val lastQueryParam = ret.getNestedOrSetEmpty("snow").getNestedOrSetEmpty("last_query")
 
-    lastQueryParam.set("ids", java.util.Arrays.asList(queries.map(_.id) :_*))
+    lastQueryParam.set("ids", java.util.Arrays.asList(queries.map(_.id): _*))
     lastQueryParam.set("query", sql)
+    ret
+  }
+
+  private def buildStoreParam(rs: ResultSet): Config = {
+    val ret = request.getConfig.getFactory.create()
+    val map = new java.util.LinkedHashMap[String, AnyRef]()
+    val metadata = rs.getMetaData
+
+    if(rs.next()) {
+      (1 to metadata.getColumnCount).foreach { i =>
+        map.put(metadata.getColumnName(i), rs.getObject(i))
+      }
+    }
+
+    ret.getNestedOrSetEmpty("snow").set("last_results", map)
     ret
   }
 }
