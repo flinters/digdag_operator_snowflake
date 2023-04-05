@@ -98,6 +98,7 @@ digdag run example.dig --session daily -a
 ```
 
 ### 3) debug an example on intellij
+https://www.jetbrains.com/help/idea/run-debug-configuration-jar.html
 
 ```bash
  JAR Application
