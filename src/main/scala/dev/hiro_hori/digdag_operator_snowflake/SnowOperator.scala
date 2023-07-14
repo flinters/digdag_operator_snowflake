@@ -104,7 +104,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
 
       val builder = TaskResult.defaultBuilder(request)
       builder.resetStoreParams(ImmutableList.of(ConfigKey.of("snow", "last_query")))
-      builder.resetStoreParams(ImmutableList.of(ConfigKey.of("snow", "last_result")))
+      builder.resetStoreParams(ImmutableList.of(ConfigKey.of("snow", "last_results")))
       builder.storeParams(output.merge(store))
       builder.build()
     } catch {
