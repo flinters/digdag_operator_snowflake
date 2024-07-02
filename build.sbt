@@ -14,9 +14,9 @@ lazy val root = (project in file("."))
     name := "digdag-operator-snowflake",
     libraryDependencies ++= Seq(
       scalaTest % Test,
-      "io.digdag" % "digdag-spi" % "0.9.42" % Provided,
-      "io.digdag" % "digdag-plugin-utils" % "0.9.42" % Provided,
-      "net.snowflake" % "snowflake-jdbc" % "3.13.4",
+      "io.digdag" % "digdag-spi" % "0.10.5.1" % Provided,
+      "io.digdag" % "digdag-plugin-utils" % "0.10.5.1" % Provided,
+      "net.snowflake" % "snowflake-jdbc" % "3.16.1",
     )
   )
 
