@@ -42,7 +42,7 @@ parameter名|必須？|補足|設定可能箇所<br>snow>の直下|設定可能�
 ---|---|---|---|---|---
 `host`|o|Snowflake環境のホスト名|o|o|x
 `user`|o|Snowflake接続ユーザー名|o|o|x
-`snow.privatekey`|o|Snowflake接続秘密キー.PEM形式のヘッダー・フッターを除いた値.|x|x|o
+`snow.privatekey`|o|Snowflake接続秘密キー. PEM形式のヘッダー・フッターを除いた値|x|x|o
 `role`|x|Snowflakeの接続ロール名|o|o|x
 `warehouse`|x|演算が行われる、Snowflakeのウェアハウス名|o|o|x
 `database`|x|セッションに使われるデータベース|o|o|x
