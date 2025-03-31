@@ -42,7 +42,7 @@ parameter名|必須？|補足|設定可能箇所<br>snow>の直下|設定可能�
 ---|---|---|---|---|---
 `host`|o|Snowflake環境のホスト名|o|o|x
 `user`|o|Snowflake接続ユーザー名|o|o|x
-`snow.password`|o|Snowflake接続パスワード|x|x|o
+`snow.privatekey`|o|Snowflake接続秘密キー|x|x|o
 `role`|x|Snowflakeの接続ロール名|o|o|x
 `warehouse`|x|演算が行われる、Snowflakeのウェアハウス名|o|o|x
 `database`|x|セッションに使われるデータベース|o|o|x
@@ -66,18 +66,18 @@ parameter名|補足
 ids|最初の1文および、SELECT文のみIDが取得できます。(CREATE文やINSERT文などはID取得できません。)
 query|
 
-### `snow.password`シークレット設定例
+### `snow.privatekey`シークレット設定例
 
-Register Snowflake password into secrets.
+Register Snowflake privatekey into secrets.
 
 local mode
 ```
-digdag secrets --local --set snow.password
+digdag secrets --local --set snow.privatekey
 ```
 
 server mode
 ```
-digdag secrets --project <project> --set snow.password
+digdag secrets --project <project> --set snow.privatekey
 ```
 
 ## 開発
