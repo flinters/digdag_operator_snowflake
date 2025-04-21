@@ -69,7 +69,8 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       getConfigFromOperatorParameterOrExportedParameter[String](localConfig, exportedConfig, "user"),
       getConfigFromSecretParameter("snow.password"),
       getConfigFromSecretParameter("snow.privatekey"),
-      getConfigFromSecretParameter("snow.privatekeyPassphrase"),
+      getConfigFromSecretParameter("snow.encryptedPrivatekey"),
+      getConfigFromSecretParameter("snow.encryptedPrivatekeyPassphrase"),
       getConfigFromOperatorParameterOrExportedParameterOptional[String](localConfig, exportedConfig, "database"),
       getConfigFromOperatorParameterOrExportedParameterOptional[String](localConfig, exportedConfig, "schema"),
       getConfigFromOperatorParameterOrExportedParameterOptional[String](localConfig, exportedConfig, "warehouse"),
@@ -135,7 +136,8 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
                      user: String,
                      password: Option[String],
                      privatekey: Option[String],
-                     privatekeyPassphrase: Option[String],
+                     encryptedPrivatekey: Option[String],
+                     encryptedPrivatekeyPassphrase: Option[String],
                      database: Option[String],
                      schema: Option[String],
                      warehouse: Option[String],
@@ -149,11 +151,16 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     )
 
     val prop = new Properties()
-    prop.put("user", user)
-    if (privatekey.isDefined) {
-      prop.put("privatekey", PrivateKeyReader.get(privatekey.getOrElse(""), privatekeyPassphrase))
+    prop.put("user", user) 
+    if (encryptedPrivatekey.isDefined && encryptedPrivatekeyPassphrase.isDefined) {
+      prop.put("privatekey", PrivateKeyReader.get(encryptedPrivatekey.getOrElse(""), encryptedPrivatekeyPassphrase))
+      println("auth-type: encrypted key-pair")
+    }else if (privatekey.isDefined) {
+      prop.put("privatekey", PrivateKeyReader.get(privatekey.getOrElse(""), None))
+      println("auth-type: key-pair")
     }else if (password.isDefined){
       prop.put("password", password.getOrElse(""))
+      println("auth-type: password")
     } else {
       throw new IllegalArgumentException("Either password or private key must be provided.")
     }
