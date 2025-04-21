@@ -42,7 +42,9 @@ parameter名|必須？|補足|設定可能箇所<br>snow>の直下|設定可能�
 ---|---|---|---|---|---
 `host`|o|Snowflake環境のホスト名|o|o|x
 `user`|o|Snowflake接続ユーザー名|o|o|x
-`snow.privatekey`|o|Snowflake接続秘密キー. PEM形式のヘッダー・フッターを除いた値|x|x|o
+`snow.privatekey`|o ※1|Snowflake接続秘密キー. PEM形式のヘッダー・フッターを除いた値|x|x|o
+`snow.privatekeyPassphrase`|o ※2|暗号化されたSnowflake接続秘密キーを復号化するためのパスフレーズ.|x|x|o
+`snow.password`|o ※1|<非推奨>Snowflake接続パスワード|x|x|o
 `role`|x|Snowflakeの接続ロール名|o|o|x
 `warehouse`|x|演算が行われる、Snowflakeのウェアハウス名|o|o|x
 `database`|x|セッションに使われるデータベース|o|o|x
@@ -59,6 +61,8 @@ parameter名|必須？|補足|設定可能箇所<br>snow>の直下|設定可能�
 `store_last_results`|x|クエリ結果の最初の1行を ${snow.last_results}変数に格納する(true&#124;false)|o|x|x
 
 snow>の直下およびexportされた`snow.{parameter}`両方に設定可能なパラメータが、両方に設定されていた場合は、snow>の直下に設定された値を優先して使用する
+※1. privatekeyとpasswordはどちらかの設定が必須. privatekeyを優先して参照.
+※2. 暗号化された秘密キーを利用する場合に必須.  
 
 ### アウトプット一覧
 parameter名|補足
@@ -78,6 +82,11 @@ digdag secrets --local --set snow.privatekey
 server mode
 ```
 digdag secrets --project <project> --set snow.privatekey
+```
+
+暗号化 -> 非暗号化秘密キーに切り替える場合、snow.privatekeyPassphraseの削除が必要  
+```
+digdag secrets --local --delete snow.privatekeyPassphrase
 ```
 
 ## 開発
