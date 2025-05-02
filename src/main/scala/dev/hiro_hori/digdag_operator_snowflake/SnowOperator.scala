@@ -153,14 +153,14 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     val prop = new Properties()
     prop.put("user", user) 
     if (encryptedPrivatekey.isDefined && encryptedPrivatekeyPassphrase.isDefined) {
-      prop.put("privatekey", PrivateKeyReader.get(encryptedPrivatekey.getOrElse(""), encryptedPrivatekeyPassphrase))
-      println("auth-type: encrypted key-pair")
+      logger.info("Using encrypted key-pair authentication")
+      prop.put("privatekey", PrivateKeyReader.get(encryptedPrivatekey.getOrElse(throw new IllegalArgumentException("encryptedPrivatekey is required")), encryptedPrivatekeyPassphrase))
     }else if (privatekey.isDefined) {
-      prop.put("privatekey", PrivateKeyReader.get(privatekey.getOrElse(""), None))
-      println("auth-type: key-pair")
+      logger.info("Using key-pair authentication")
+      prop.put("privatekey", PrivateKeyReader.get(privatekey.getOrElse(throw new IllegalArgumentException("privatekey is required")), None))
     }else if (password.isDefined){
-      prop.put("password", password.getOrElse(""))
-      println("auth-type: password")
+      logger.info("Using password authentication")
+      prop.put("password", password.getOrElse(throw new IllegalArgumentException("password is required")))
     } else {
       throw new IllegalArgumentException("Either password or private key must be provided.")
     }
@@ -245,7 +245,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       
       pemObject match {
         case encryptedPrivateKeyInfo: PKCS8EncryptedPrivateKeyInfo =>
-          val passphrase = privatekeyPass.getOrElse("")
+          val passphrase = privatekeyPass.getOrElse(throw new IllegalArgumentException("encryptedPrivatekeyPassphrase is required"))
           val pkcs8Prov: InputDecryptorProvider = new JceOpenSSLPKCS8DecryptorProviderBuilder().build(passphrase.toCharArray)
           privateKeyInfo = encryptedPrivateKeyInfo.decryptPrivateKeyInfo(pkcs8Prov)
         case privateKeyInfoInstance: PrivateKeyInfo =>

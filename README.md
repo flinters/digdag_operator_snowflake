@@ -85,6 +85,23 @@ server mode
 digdag secrets --project <project> --set snow.privatekey
 ```
 
+### `snow.encryptedPrivatekey`シークレット設定例
+
+Register Snowflake encryptedPrivatekey into secrets.
+Also register with encryptedPrivatekeyPassphrase.
+
+local mode
+```
+digdag secrets --local --set snow.encryptedPrivatekey
+digdag secrets --local --set snow.encryptedPrivatekeyPassphrase
+```
+
+server mode
+```
+digdag secrets --project <project> --set snow.encryptedPrivatekey
+digdag secrets --project <project> --set snow.encryptedPrivatekeyPassphrase
+```
+
 ## 開発
 
 ### 1) build
