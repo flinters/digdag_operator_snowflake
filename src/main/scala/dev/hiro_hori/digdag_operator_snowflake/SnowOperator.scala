@@ -5,13 +5,25 @@ import io.digdag.client.config.{Config, ConfigKey}
 import io.digdag.spi._
 import io.digdag.util.BaseOperator
 import net.snowflake.client.jdbc.{SnowflakeDriver, SnowflakeResultSet, SnowflakeStatement}
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.openssl.PEMParser
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
+import org.bouncycastle.openssl.jcajce.JceOpenSSLPKCS8DecryptorProviderBuilder
+import org.bouncycastle.operator.InputDecryptorProvider
+import org.bouncycastle.operator.OperatorCreationException
+import org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo
+import org.bouncycastle.pkcs.PKCSException
 import org.slf4j.LoggerFactory
 
+import java.io.StringReader
 import java.nio.charset.StandardCharsets.UTF_8
+import java.security.{PrivateKey, Security}
 import java.sql.{Connection, DriverManager, ResultSet}
 import java.util.Properties
-import scala.reflect.ClassTag
 
+import scala.reflect.ClassTag
+import scala.util.{Try, Success, Failure}
 
 // オペレータ本体
 class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) extends BaseOperator(_context) {
@@ -55,7 +67,10 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     val conn = getConnection(
       getConfigFromOperatorParameterOrExportedParameter[String](localConfig, exportedConfig, "host"),
       getConfigFromOperatorParameterOrExportedParameter[String](localConfig, exportedConfig, "user"),
-      context.getSecrets.getSecret("snow.password"),
+      getConfigFromSecretParameter("snow.password"),
+      getConfigFromSecretParameter("snow.privatekey"),
+      getConfigFromSecretParameter("snow.encryptedPrivatekey"),
+      getConfigFromSecretParameter("snow.encryptedPrivatekeyPassphrase"),
       getConfigFromOperatorParameterOrExportedParameterOptional[String](localConfig, exportedConfig, "database"),
       getConfigFromOperatorParameterOrExportedParameterOptional[String](localConfig, exportedConfig, "schema"),
       getConfigFromOperatorParameterOrExportedParameterOptional[String](localConfig, exportedConfig, "warehouse"),
@@ -119,7 +134,10 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
   private def getConnection(
                      host: String,
                      user: String,
-                     password: String,
+                     password: Option[String],
+                     privatekey: Option[String],
+                     encryptedPrivatekey: Option[String],
+                     encryptedPrivatekeyPassphrase: Option[String],
                      database: Option[String],
                      schema: Option[String],
                      warehouse: Option[String],
@@ -133,8 +151,19 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     )
 
     val prop = new Properties()
-    prop.put("user", user)
-    prop.put("password", password)
+    prop.put("user", user) 
+    if (encryptedPrivatekey.isDefined && encryptedPrivatekeyPassphrase.isDefined) {
+      logger.info("Using encrypted key-pair authentication")
+      prop.put("privatekey", PrivateKeyReader.get(encryptedPrivatekey.getOrElse(throw new IllegalArgumentException("encryptedPrivatekey is required")), encryptedPrivatekeyPassphrase))
+    }else if (privatekey.isDefined) {
+      logger.info("Using key-pair authentication")
+      prop.put("privatekey", PrivateKeyReader.get(privatekey.getOrElse(throw new IllegalArgumentException("privatekey is required")), None))
+    }else if (password.isDefined){
+      logger.info("Using password authentication")
+      prop.put("password", password.getOrElse(throw new IllegalArgumentException("password is required")))
+    } else {
+      throw new IllegalArgumentException("Either password or private key must be provided.")
+    }
     database.foreach(x => prop.put("db", x))
     schema.foreach(x => prop.put("schema", x))
     warehouse.foreach(x => prop.put("warehouse", x))
@@ -148,6 +177,13 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     } catch {
       case e: Throwable =>
         throw new TaskExecutionException(e)
+    }
+  }
+
+  private def getConfigFromSecretParameter(configName: String): Option[String] = {
+    Try(context.getSecrets.getSecret(configName)) match {
+      case Success(value) => Some(value)
+      case Failure(_) => None
     }
   }
 
@@ -191,6 +227,37 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
 
     ret.getNestedOrSetEmpty("snow").set("last_results", map)
     ret
+  }
+
+  object PrivateKeyReader {
+
+    def get(privatekeyStr: String, privatekeyPass: Option[String]): PrivateKey = {
+      var privateKeyInfo: PrivateKeyInfo = null
+      Security.addProvider(new BouncyCastleProvider())
+
+      val privatekeyPem = if(privatekeyPass.isDefined){
+                            "-----BEGIN ENCRYPTED PRIVATE KEY-----\n" + privatekeyStr + "\n-----END ENCRYPTED PRIVATE KEY-----"
+                          } else {
+                            "-----BEGIN PRIVATE KEY-----\n" + privatekeyStr + "\n-----END PRIVATE KEY-----"
+                          }
+      val pemParser = new PEMParser(new StringReader(privatekeyPem))
+      val pemObject = pemParser.readObject()
+      
+      pemObject match {
+        case encryptedPrivateKeyInfo: PKCS8EncryptedPrivateKeyInfo =>
+          val passphrase = privatekeyPass.getOrElse(throw new IllegalArgumentException("encryptedPrivatekeyPassphrase is required"))
+          val pkcs8Prov: InputDecryptorProvider = new JceOpenSSLPKCS8DecryptorProviderBuilder().build(passphrase.toCharArray)
+          privateKeyInfo = encryptedPrivateKeyInfo.decryptPrivateKeyInfo(pkcs8Prov)
+        case privateKeyInfoInstance: PrivateKeyInfo =>
+          privateKeyInfo = privateKeyInfoInstance
+        case _ =>
+          throw new IllegalArgumentException("Unsupported PEM object type") 
+      }
+
+      pemParser.close()
+      val converter = new JcaPEMKeyConverter().setProvider(BouncyCastleProvider.PROVIDER_NAME)
+      converter.getPrivateKey(privateKeyInfo)
+    }
   }
 }
 
