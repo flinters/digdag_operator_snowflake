@@ -42,8 +42,8 @@ parameter名|必須？|補足|設定可能箇所<br>snow>の直下|設定可能�
 ---|---|---|---|---|---
 `host`|o|Snowflake環境のホスト名|o|o|x
 `user`|o|Snowflake接続ユーザー名|o|o|x
-`snow.encryptedPrivatekey`|o ※1|暗号化されたSnowflake接続秘密キー. PEM形式のヘッダー・フッターを除いた値|x|x|o
-`snow.encryptedPrivatekeyPassphrase`|o ※2|暗号化されたSnowflake接続秘密キーを復号化するためのパスフレーズ.|x|x|o
+`snow.encrypted_privatekey`|o ※1|暗号化されたSnowflake接続秘密キー. PEM形式のヘッダー・フッターを除いた値|x|x|o
+`snow.encrypted_privatekey_passphrase`|o ※2|暗号化されたSnowflake接続秘密キーを復号化するためのパスフレーズ.|x|x|o
 `snow.privatekey`|o ※1|Snowflake接続秘密キー. PEM形式のヘッダー・フッターを除いた値|x|x|o
 `snow.password`|o ※1|<非推奨>Snowflake接続パスワード|x|x|o
 `role`|x|Snowflakeの接続ロール名|o|o|x
@@ -62,8 +62,8 @@ parameter名|必須？|補足|設定可能箇所<br>snow>の直下|設定可能�
 `store_last_results`|x|クエリ結果の最初の1行を ${snow.last_results}変数に格納する(true&#124;false)|o|x|x
 
 snow>の直下およびexportされた`snow.{parameter}`両方に設定可能なパラメータが、両方に設定されていた場合は、snow>の直下に設定された値を優先して使用する
-※1. encryptedPrivatekey/privatekey/passwordのいずれかの設定が必須. 優先順位は左から順.
-※2. encryptedPrivatekeyを利用する場合に必須.  
+※1. encrypted_privatekey/privatekey/passwordのいずれかの設定が必須. 優先順位は左から順.
+※2. encrypted_privatekeyを利用する場合に必須.  
 
 ### アウトプット一覧
 parameter名|補足
@@ -85,21 +85,21 @@ server mode
 digdag secrets --project <project> --set snow.privatekey
 ```
 
-### `snow.encryptedPrivatekey`シークレット設定例
+### `snow.encrypted_privatekey`シークレット設定例
 
-Register Snowflake encryptedPrivatekey into secrets.
-Also register with encryptedPrivatekeyPassphrase.
+Register Snowflake encrypted_privatekey into secrets.
+Also register with encrypted_privatekey_passphrase.
 
 local mode
 ```
-digdag secrets --local --set snow.encryptedPrivatekey
-digdag secrets --local --set snow.encryptedPrivatekeyPassphrase
+digdag secrets --local --set snow.encrypted_privatekey
+digdag secrets --local --set snow.encrypted_privatekey_passphrase
 ```
 
 server mode
 ```
-digdag secrets --project <project> --set snow.encryptedPrivatekey
-digdag secrets --project <project> --set snow.encryptedPrivatekeyPassphrase
+digdag secrets --project <project> --set snow.encrypted_privatekey
+digdag secrets --project <project> --set snow.encrypted_privatekey_passphrase
 ```
 
 ## 開発

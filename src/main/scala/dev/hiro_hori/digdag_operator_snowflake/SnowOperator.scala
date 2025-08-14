@@ -69,8 +69,8 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       getConfigFromOperatorParameterOrExportedParameter[String](localConfig, exportedConfig, "user"),
       getConfigFromSecretParameter("snow.password"),
       getConfigFromSecretParameter("snow.privatekey"),
-      getConfigFromSecretParameter("snow.encryptedPrivatekey"),
-      getConfigFromSecretParameter("snow.encryptedPrivatekeyPassphrase"),
+      getConfigFromSecretParameter("snow.encrypted_privatekey"),
+      getConfigFromSecretParameter("snow.encrypted_privatekey_passphrase"),
       getConfigFromOperatorParameterOrExportedParameterOptional[String](localConfig, exportedConfig, "database"),
       getConfigFromOperatorParameterOrExportedParameterOptional[String](localConfig, exportedConfig, "schema"),
       getConfigFromOperatorParameterOrExportedParameterOptional[String](localConfig, exportedConfig, "warehouse"),
@@ -154,7 +154,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
     prop.put("user", user) 
     if (encryptedPrivatekey.isDefined && encryptedPrivatekeyPassphrase.isDefined) {
       logger.info("Using encrypted key-pair authentication")
-      prop.put("privatekey", PrivateKeyReader.get(encryptedPrivatekey.getOrElse(throw new IllegalArgumentException("encryptedPrivatekey is required")), encryptedPrivatekeyPassphrase))
+      prop.put("privatekey", PrivateKeyReader.get(encryptedPrivatekey.getOrElse(throw new IllegalArgumentException("encrypted_privatekey is required")), encryptedPrivatekeyPassphrase))
     }else if (privatekey.isDefined) {
       logger.info("Using key-pair authentication")
       prop.put("privatekey", PrivateKeyReader.get(privatekey.getOrElse(throw new IllegalArgumentException("privatekey is required")), None))
@@ -245,7 +245,7 @@ class SnowOperator(_context: OperatorContext, templateEngine: TemplateEngine) ex
       
       pemObject match {
         case encryptedPrivateKeyInfo: PKCS8EncryptedPrivateKeyInfo =>
-          val passphrase = privatekeyPass.getOrElse(throw new IllegalArgumentException("encryptedPrivatekeyPassphrase is required"))
+          val passphrase = privatekeyPass.getOrElse(throw new IllegalArgumentException("encrypted_privatekey_passphrase is required"))
           val pkcs8Prov: InputDecryptorProvider = new JceOpenSSLPKCS8DecryptorProviderBuilder().build(passphrase.toCharArray)
           privateKeyInfo = encryptedPrivateKeyInfo.decryptPrivateKeyInfo(pkcs8Prov)
         case privateKeyInfoInstance: PrivateKeyInfo =>
