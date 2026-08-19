@@ -4,7 +4,9 @@ import com.google.common.collect.ImmutableList
 import io.digdag.client.config.{Config, ConfigKey}
 import io.digdag.spi._
 import io.digdag.util.BaseOperator
-import net.snowflake.client.jdbc.{SnowflakeDriver, SnowflakeResultSet, SnowflakeStatement}
+import net.snowflake.client.api.driver.SnowflakeDriver
+import net.snowflake.client.api.resultset.SnowflakeResultSet
+import net.snowflake.client.api.statement.SnowflakeStatement
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.openssl.PEMParser
